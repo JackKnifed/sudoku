@@ -4,10 +4,8 @@ package sudoku
 
 // Communication is handled by four major mechanics:
 // * A channel to distribute the current board state
-// * A channel to update known values
-// * A channel to update possibles values
 // * A channel to notify threads of updates
-// If
+// * A channel to update known & possible values
 
 // coord contains x and y elements for a given position
 type coord struct {
