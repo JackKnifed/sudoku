@@ -1,6 +1,6 @@
 package sudoku
 
-type indexedCluster map[int]struct{
+type indexedCluster map[int]struct {
 	targets []int
 }
 
@@ -72,13 +72,13 @@ func eliminatePossibles(workingCluster []cell, u chan cell) bool {
 
 func confirmIndexed(index indexedCluster, workingCluster []cell, u chan cell) bool {
 	var changed bool
-	for val, section := range index{
-		if len(section.targets) < 1{
+	for val, section := range index {
+		if len(section.targets) < 1 {
 			// something went terribly wrong here
 		} else if len(section.targets) == 1 {
 			u <- cell{
 				location: workingCluster[section.targets[0]].location,
-				actual: val,
+				actual:   val,
 			}
 			changed = true
 		}
@@ -86,17 +86,43 @@ func confirmIndexed(index indexedCluster, workingCluster []cell, u chan cell) bo
 	return changed
 }
 
-func findPairs(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
-	searchCount := 2
-
-	for searchCount < len(index) {
-		for val, valIndex := range localIndex {
-			if len(valIndex) <= searchCount {
-				localIndex := index
-				// this could be a first in a pair
-				// probalby use something recursive to find the second match? idk
-
-			}
+func additionalCost(addVal int, markedVals map[int]bool, index indexedCluster) int {
+	// skip this one if it's already marked
+	if markedVals[addVal] {
+		return -1
+	}
+	var newCols map[int]bool
+	for target, _ := range index[addVal].targets {
+		newCols[target] = true
+	}
+	for preIndexed, _ := range markedVals {
+		for target, _ := range index[preIndexed].targets {
+			delete(newCols, target)
 		}
 	}
+	return len(newCols)
 }
+
+func findPairsChild(markedVals, markedTargets []int, index indexedCluster, workingCluster []cell, u chan cell) (additionalCell cell, changed bool) {
+}
+
+// func findPairs(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
+// 	searchCount := 2
+
+// 	localIndex := index
+// 	for searchCount < len(index) {
+// 		for val, valIndex := range localIndex {
+// 			if len(valIndex.targets) <= searchCount {
+// 				localIndex := index
+// 				// this could be a first in a pair
+// 				// probalby use something recursive to find the second match? idk
+
+// 			}
+// 		}
+// 	}
+// }
+
+// func cheapestAddition(markedVals map[int]bool, index indexedCluster)(int, int){
+// 	var markedCells map[int]bool
+// 	for k, v :=
+// }
