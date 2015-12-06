@@ -37,6 +37,40 @@ func indexCluster(in []cell) (out indexedCluster) {
 	return out
 }
 
+// Removes known values from other possibles in the same cluster
+// Covers rule 3 from above:
+// 3) If any cell is solved, that value is not possible in other cells.
+func eliminatePossibles(workingCluster []cell, u chan cell) bool {
+	var solved map[int]bool
+	var remove map[int]bool
+	var changed bool
+
+	// Loop thru and find all solved values.
+	for _, each := range workingCluster {
+		if each.actual != 0 {
+			solved[each.actual] = true
+		}
+	}
+
+	for _, each := range workingCluster {
+		for i, potential := range each.possible {
+			if potential && solved[i] {
+				remove[i] = true
+			}
+		}
+		if len(remove) > 0 {
+			// send back removal of possibles & reset
+			changed = true
+			u <- cell{
+				location: each.location,
+				possible: remove,
+			}
+			remove = map[int]bool{}
+		}
+	}
+	return changed
+}
+
 // This covers the 4th rule from above:
 // 4) If any cell only has one possible value, that is that cell's value.
 func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
@@ -51,7 +85,7 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 			continue
 		}
 
-		// should never happen
+		// should never happen - probably #TODO# to catch this
 		if len(workingCell.possible) < 1 {
 			panic("Found an unsolved cell with no possible values")
 		}
@@ -68,37 +102,6 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 		u <- cell{
 			location: workingCell.location,
 			actual:   key,
-		}
-	}
-	return changed
-}
-
-// Removes known values from other possibles in the same cluster
-func eliminatePossibles(workingCluster []cell, u chan cell) bool {
-	var solved map[int]bool
-	var remove map[int]bool
-	var changed bool
-
-	for _, each := range workingCluster {
-		if each.actual != 0 {
-			solved[each.actual] = true
-		}
-	}
-
-	for _, each := range workingCluster {
-		for i, potential := range each.possible {
-			if potential && solved[i] {
-				remove[i] = true
-				changed = true
-			}
-		}
-		if len(remove) > 0 {
-			// send back removal of possibles & reset
-			u <- cell{
-				location: each.location,
-				possible: remove,
-			}
-			remove = map[int]bool{}
 		}
 	}
 	return changed
