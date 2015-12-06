@@ -1,15 +1,37 @@
 package sudoku
 
-type indexedCluster map[int]struct {
-	targets []int
-}
+// Sudoku has one rule - no value can be repeated horizontally, vertically,
+// or in the same section. This gives rise to a few simple rules - and those
+// rules are applied across each cluster - without even knowning the orientation
+// of the cluster.
+//
+// In order to make solving possible however, that one rule is enforced with
+// the following rules:
+//
+// 1) If all cells are solved, that cluster is solved.
+// 2) If any cell is solved, it has no possibles.
+// 3) If any cell is solved, that value is not possible in other cells.
+// 4) If any cell only has one possible value, that is that cell's value.
+// 5)If any x cells have x possible values, other cells in the cluster cannot be
+//  those values - those values are constrained to those cells.
+// 6) If any value only has one possible cell, that is that cell's value.
+// 7) If any x values have x possible cells, other values are not possible
+//  in those cells - those cells are constrained to those values.
+//
+// Additional Helper functions are included and explained later.
+
+// indexedCLuster is a datatype for an index for the values of the cluster.
+// Each possible value is a key in the map. THe value of each key is an array of
+// possible locations for that value - the index and order are not defined,
+// instead the values of the array are the indexes of possible cells in for that
+// value.
+type intArray []int
+type indexedCluster map[int]intArray
 
 func indexCluster(in []cell) (out indexedCluster) {
 	for id, each := range in {
 		for onePossible, _ := range each.possible {
-			tmp := out[onePossible]
-			tmp.targets = append(tmp.targets, id)
-			out[onePossible] = tmp
+			out[onePossible] = append(out[onePossible], id)
 		}
 	}
 	return out
@@ -73,11 +95,14 @@ func eliminatePossibles(workingCluster []cell, u chan cell) bool {
 func confirmIndexed(index indexedCluster, workingCluster []cell, u chan cell) bool {
 	var changed bool
 	for val, section := range index {
-		if len(section.targets) < 1 {
+		// if len(section.targets) < 1 {
+		if len(section) < 1 {
 			// something went terribly wrong here
-		} else if len(section.targets) == 1 {
+			// } else if len(section.targets) == 1 {
+		} else if len(section) == 1 {
 			u <- cell{
-				location: workingCluster[section.targets[0]].location,
+				// location: workingCluster[section.targets[0]].location,
+				location: workingCluster[section[0]].location,
 				actual:   val,
 			}
 			changed = true
@@ -92,11 +117,13 @@ func additionalCost(addVal int, markedVals map[int]bool, index indexedCluster) i
 		return -1
 	}
 	var newCols map[int]bool
-	for target, _ := range index[addVal].targets {
+	// for target, _ := range index[addVal].targets {
+	for target, _ := range index[addVal] {
 		newCols[target] = true
 	}
 	for preIndexed, _ := range markedVals {
-		for target, _ := range index[preIndexed].targets {
+		// for target, _ := range index[preIndexed].targets {
+		for target, _ := range index[preIndexed] {
 			delete(newCols, target)
 		}
 	}
@@ -126,15 +153,14 @@ func findPairsChild(markedVals map[int]bool, budget, required int, index indexed
 			markedValsCopy[possibleVal] = true
 			// if you already have the hit, mark it
 			if required >= len(markedValsCopy) {
-				if processSquares(){
+				if processSquares() {
 
 				}
-
 
 			}
 
 			// if you need to go down recursively, do it
-			if findPairsChild(makredValsCopy, budget - deduction, required, index, workingCluster) {
+			if findPairsChild(makredValsCopy, budget-deduction, required, index, workingCluster) {
 				return true
 			}
 		}
