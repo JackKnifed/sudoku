@@ -103,7 +103,42 @@ func additionalCost(addVal int, markedVals map[int]bool, index indexedCluster) i
 	return len(newCols)
 }
 
-func findPairsChild(markedVals, markedTargets []int, index indexedCluster, workingCluster []cell, u chan cell) (additionalCell cell, changed bool) {
+// Given certain premarked values, searches an index to find the next value to
+// mark while staying under the given budget. If something is found to match
+// the required values under the squares budget, changes are made.
+func findPairsChild(markedVals map[int]bool, budget, required int, index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
+	for possibleVal, locations := range index {
+		if markedVals[possibleVal] {
+			// this cell is already on the list, so skip it
+			continue
+		}
+		// if len(locations.targets) > budget {
+		if len(locations) > budget {
+			// adding this cell will never fit in the budget, so skip it
+			continue
+		}
+		// you can't add anything, so return false
+		if budget < 1 {
+			return false
+		}
+		if deduction := additionalCost(possibleVal, markedVals, index); deduction < budget {
+			markedValsCopy := markedVals
+			markedValsCopy[possibleVal] = true
+			// if you already have the hit, mark it
+			if required >= len(markedValsCopy) {
+				if processSquares(){
+
+				}
+
+
+			}
+
+			// if you need to go down recursively, do it
+			if findPairsChild(makredValsCopy, budget - deduction, required, index, workingCluster) {
+				return true
+			}
+		}
+	}
 }
 
 // func findPairs(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
