@@ -40,7 +40,7 @@ func indexCluster(in []cell) (out indexedCluster) {
 // Removes known values from other possibles in the same cluster
 // Covers rule 3 from above:
 // 3) If any cell is solved, that value is not possible in other cells.
-func eliminatePossibles(workingCluster []cell, u chan cell) bool {
+func eliminateKnowns(workingCluster []cell, u chan cell) bool {
 	var solved map[int]bool
 	var remove map[int]bool
 	var changed bool
