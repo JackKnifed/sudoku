@@ -37,28 +37,40 @@ func indexCluster(in []cell) (out indexedCluster) {
 	return out
 }
 
-// look at the possible values for a cell - if there's only one, mark that cell as solved
-func confirmCell(workingCell cell, u chan cell) bool {
-	var firstFind int
-
-	for loc, each := range workingCell.possible {
-		if each {
-			if firstFind != 0 {
-				// I found two possible values for this cell
-				return false
-			}
-			firstFind = loc
+// This covers the 4th rule from above:
+// 4) If any cell only has one possible value, that is that cell's value.
+func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
+	for _, workingCell := range cluster {
+		// if the cell is already solved, skip this.
+		if workingCell.actual != 0 {
+			continue
 		}
-		if firstFind != 0 {
-			// send back an update and return true - you changed something
-			u <- cell{
-				location: workingCell.location,
-				actual:   firstFind,
-			}
-			return true
+
+		// if there is more than one possible value for this cell, you should be good
+		if len(workingCell.possible) > 1 {
+			continue
+		}
+
+		// should never happen
+		if len(workingCell.possible) < 1 {
+			panic("Found an unsolved cell with no possible values")
+		}
+
+		changed = true
+
+		// this empty for loop will set value to each key in the map
+		// since there's one key, it gives me that one key
+		var key int
+		for key, _ = range workingCell.possible {
+		}
+
+		// send back an update for this cell
+		u <- cell{
+			location: workingCell.location,
+			actual:   key,
 		}
 	}
-	return false
+	return changed
 }
 
 // Removes known values from other possibles in the same cluster
