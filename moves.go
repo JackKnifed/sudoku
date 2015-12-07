@@ -39,26 +39,14 @@ func indexCluster(in []cell) (out indexedCluster) {
 
 // A helper function to determine the number of cells hit by working across a
 // number of values.
-func valuesCost(markedVals []int, index indexedCluster, cluseter []cell) (int) {
+func valuesCost(markedVals map[int]bool, index indexedCluster, cluseter []cell) int {
 	var neededCells map[int]bool
-	for _, value := range markedVals{
-		for oneCell, _ := range index[value]{
+	for value, _ := range markedVals {
+		for oneCell, _ := range index[value] {
 			neededCells[oneCell] = true
 		}
 	}
 	return len(neededCells)
-}
-
-// A helper function to determine the number of valus hit given a specific set
-// of cells.
-func cellsCost(markedCells []int, cluster []cell) (int) {
-	var neededValues map[int]bool
-	for _, cellPos := range markedCells {
-		for possibleValue, _ := range cluster[cellPos].possible {
-			neededValues[possibleValue] = true
-		}
-	}
-	return len(neededValues)
 }
 
 // This covers rule 1 from above:
@@ -66,7 +54,7 @@ func cellsCost(markedCells []int, cluster []cell) (int) {
 func clusterSolved(cluster []cell, u chan cell) (solved bool) {
 	solved = true
 	for _, each := range cluster {
-		if each.actual ==0 {
+		if each.actual == 0 {
 			solved = false
 		} else if len(each.possible) > 0 {
 			solved = false
@@ -163,6 +151,102 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 	return changed
 }
 
+// A helper function to determine the number of valus hit given a specific set
+// of cells.
+func cellsCost(markedCells map[int]bool, cluster []cell) int {
+	var neededValues map[int]bool
+	for cellPos, _ := range markedCells {
+		for possibleValue, _ := range cluster[cellPos].possible {
+			neededValues[possibleValue] = true
+		}
+	}
+	return len(neededValues)
+}
+
+func cellLimiterChild(limit int, markedCells map[int]bool, cluster []cell, u chan cell) (changed bool) {
+	valueCount := cellsCost(markedCells, cluster)
+	// you have overspent - it's a no-go
+	if len(markedCells) > limit {
+		return false
+	}
+
+	// you have room to add more cells
+	if len(markedCells) < limit {
+		if valueCount < len(markedCells) {
+			// #TODO# probably fix this? rework into error?
+			panic("less possible values than squares to fill")
+		}
+		if valueCount > len(markedCells) {
+			// you need to try adding each other cell
+			for idCell, oneCell := range cluster {
+				if oneCell.actual != 0 {
+					continue
+				}
+				if markedCells[idCell] {
+					// this cell is already in the map, skip
+					continue
+				}
+
+				// decend down into looking at that cell
+				childMarkedCells := markedCells // #TODO# map copy
+				childMarkedCells[idCell] = true
+				if cellLimiterChild(limit, childMarkedCells, cluster, u) {
+					// if you got true from the child, pass it on
+					return true
+				}
+			}
+		}
+	}
+
+	// did you fill the cells? if so, mark it
+	if valueCount == len(markedCells) {
+		// it's a match - so remove values
+		for idCell, oneCell := range cluster {
+			if oneCell.actual != 0 {
+				// already solved
+				continue
+			}
+			if markedCells[idCell] {
+				// this cell is a part of the list - no exclusions needed
+				continue
+			}
+			remove := map[int]bool{}
+			for potential, _ := range oneCell.possible {
+				if markedCells[idCell] {
+					// this possibility exists in the map - need to remove it
+					remove[potential] = true
+				}
+			}
+			if len(remove) > 0 {
+				changed = true
+				u <- cell{
+					location: oneCell.location,
+					possible: remove,
+				}
+			}
+		}
+	}
+	return changed
+}
+
+// This covers rule 5:
+// 5) If any x cells have x possible values, those values are not possible
+//  outside of those cells - those values are constrained to those cells.
+func cellLimiter(cluster []cell, u chan cell) (changed bool) {
+	upperBound := len(cluster)
+	for _, eachCell := range cluster{
+		if eachCell.actual != 0{
+			upperBound--
+		}
+	}
+	for i :=2; i <= upperBound; i++ {
+		if cellLimiterChild(i, map[int]bool{}, cluster, u) {
+			changed = true
+		}
+	}
+	return changed
+}
+
 // This covers rule 6 from above:
 // 6) If any value only has one possible cell, that is that cell's value.
 func singleCellSolver(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
@@ -219,7 +303,7 @@ func findPairsChild(markedVals map[int]bool, budget, required int, index indexed
 			return false
 		}
 		if deduction := additionalCost(possibleVal, markedVals, index); deduction < budget {
-			markedValsCopy := markedVals
+			markedValsCopy := markedVals // #TODO# map copy
 			markedValsCopy[possibleVal] = true
 			// if you already have the hit, mark it
 			if required >= len(markedValsCopy) {
@@ -236,24 +320,3 @@ func findPairsChild(markedVals map[int]bool, budget, required int, index indexed
 		}
 	}
 }
-
-// func findPairs(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
-// 	searchCount := 2
-
-// 	localIndex := index
-// 	for searchCount < len(index) {
-// 		for val, valIndex := range localIndex {
-// 			if len(valIndex.targets) <= searchCount {
-// 				localIndex := index
-// 				// this could be a first in a pair
-// 				// probalby use something recursive to find the second match? idk
-
-// 			}
-// 		}
-// 	}
-// }
-
-// func cheapestAddition(markedVals map[int]bool, index indexedCluster)(int, int){
-// 	var markedCells map[int]bool
-// 	for k, v :=
-// }
