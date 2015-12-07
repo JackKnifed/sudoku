@@ -12,11 +12,11 @@ package sudoku
 // 2) If any cell is solved, it has no possibles.
 // 3) If any cell is solved, that value is not possible in other cells.
 // 4) If any cell only has one possible value, that is that cell's value.
-// 5) If any x cells have x possible values, other cells in the cluster cannot
-//  be those values - those values are constrained to those cells.
+// 5) If any x cells have x possible values, those values are not possible
+//  outside of those cells - those values are constrained to those cells.
 // 6) If any value only has one possible cell, that is that cell's value.
-// 7) If any x values have x possible cells, other values are not possible
-//  in those cells - those cells are constrained to those values.
+// 7) If any x values have x possible cells, those cells only have those
+//  possible values - those cells are constrained to those values.
 //
 // Additional Helper functions are included and explained later.
 
@@ -35,6 +35,24 @@ func indexCluster(in []cell) (out indexedCluster) {
 		}
 	}
 	return out
+}
+
+// This covers rule 2 from above:
+// 2) If any cell is solved, it has no possibles.
+func solvedNoPossible(cluster []cell, u chan cell) (changed bool) {
+	for _, each := range cluster {
+		if each.actual == 0 {
+			continue
+		}
+		if len(each.possible) > 0 {
+			changed = true
+			u <- cell{
+				location: each.location,
+				possible: each.possible,
+			}
+		}
+	}
+	return changed
 }
 
 // Removes known values from other possibles in the same cluster
@@ -107,14 +125,12 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 	return changed
 }
 
-// This covers rule 5 from above:
-// 5) If any x cells have x possible values, other cells in the cluster cannot
-//  be those values - those values are constrained to those cells.
-func singleCellSolver(index indexedCluster, workingCluster []cell, u chan cell) bool {
-	var changed bool
+// This covers rule 6 from above:
+// 6) If any value only has one possible cell, that is that cell's value.
+func singleCellSolver(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
 	for val, section := range index {
 		if len(section) < 1 {
-			// something went terribly wrong here
+			// something went terribly wrong here - #TODO# add panic catch?
 			panic("Found an unsolved cell with no possible values")
 		} else if len(section) == 1 {
 			u <- cell{
