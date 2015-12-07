@@ -37,6 +37,30 @@ func indexCluster(in []cell) (out indexedCluster) {
 	return out
 }
 
+// A helper function to determine the number of cells hit by working across a
+// number of values.
+func valuesCost(markedVals []int, index indexedCluster, cluseter []cell) (int) {
+	var neededCells map[int]bool
+	for _, value := range markedVals{
+		for oneCell, _ := range index[value]{
+			neededCells[oneCell] = true
+		}
+	}
+	return len(neededCells)
+}
+
+// A helper function to determine the number of valus hit given a specific set
+// of cells.
+func cellsCost(markedCells []int, cluster []cell) (int) {
+	var neededValues map[int]bool
+	for _, cellPos := range markedCells {
+		for possibleValue, _ := range cluster[cellPos].possible {
+			neededValues[possibleValue] = true
+		}
+	}
+	return len(neededValues)
+}
+
 // This covers rule 1 from above:
 // 1) If all cells are solved, that cluster is solved.
 func clusterSolved(cluster []cell, u chan cell) (solved bool) {
