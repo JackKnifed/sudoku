@@ -37,6 +37,20 @@ func indexCluster(in []cell) (out indexedCluster) {
 	return out
 }
 
+// This covers rule 1 from above:
+// 1) If all cells are solved, that cluster is solved.
+func clusterSolved(cluster []cell, u chan cell) (solved bool) {
+	solved = true
+	for _, each := range cluster {
+		if each.actual ==0 {
+			solved = false
+		} else if len(each.possible) > 0 {
+			solved = false
+		}
+	}
+	return solved
+}
+
 // This covers rule 2 from above:
 // 2) If any cell is solved, it has no possibles.
 func solvedNoPossible(cluster []cell, u chan cell) (changed bool) {
