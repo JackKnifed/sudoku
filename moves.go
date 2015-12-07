@@ -12,8 +12,8 @@ package sudoku
 // 2) If any cell is solved, it has no possibles.
 // 3) If any cell is solved, that value is not possible in other cells.
 // 4) If any cell only has one possible value, that is that cell's value.
-// 5)If any x cells have x possible values, other cells in the cluster cannot be
-//  those values - those values are constrained to those cells.
+// 5) If any x cells have x possible values, other cells in the cluster cannot
+//  be those values - those values are constrained to those cells.
 // 6) If any value only has one possible cell, that is that cell's value.
 // 7) If any x values have x possible cells, other values are not possible
 //  in those cells - those cells are constrained to those values.
@@ -107,16 +107,17 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 	return changed
 }
 
-func confirmIndexed(index indexedCluster, workingCluster []cell, u chan cell) bool {
+// This covers rule 5 from above:
+// 5) If any x cells have x possible values, other cells in the cluster cannot
+//  be those values - those values are constrained to those cells.
+func singleCellSolver(index indexedCluster, workingCluster []cell, u chan cell) bool {
 	var changed bool
 	for val, section := range index {
-		// if len(section.targets) < 1 {
 		if len(section) < 1 {
 			// something went terribly wrong here
-			// } else if len(section.targets) == 1 {
+			panic("Found an unsolved cell with no possible values")
 		} else if len(section) == 1 {
 			u <- cell{
-				// location: workingCluster[section.targets[0]].location,
 				location: workingCluster[section[0]].location,
 				actual:   val,
 			}
