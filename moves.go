@@ -12,10 +12,10 @@ package sudoku
 // 2) If any cell is solved, it has no possibles.
 // 3) If any cell is solved, that value is not possible in other cells.
 // 4) If any cell only has one possible value, that is that cell's value.
-// 5) If any x cells have x possible values, those values are not possible
+// 5) If any x cells only have x possible values, those values are not possible
 //  outside of those cells - those values are constrained to those cells.
 // 6) If any value only has one possible cell, that is that cell's value.
-// 7) If any x values have x possible cells, those cells only have those
+// 7) If any x values only have x possible cells, those cells only have those
 //  possible values - those cells are constrained to those values.
 //
 // Additional Helper functions are included and explained later.
@@ -35,18 +35,6 @@ func indexCluster(in []cell) (out indexedCluster) {
 		}
 	}
 	return out
-}
-
-// A helper function to determine the number of cells hit by working across a
-// number of values.
-func valuesCost(markedVals map[int]bool, index indexedCluster, cluseter []cell) int {
-	var neededCells map[int]bool
-	for value, _ := range markedVals {
-		for oneCell, _ := range index[value] {
-			neededCells[oneCell] = true
-		}
-	}
-	return len(neededCells)
 }
 
 // This covers rule 1 from above:
@@ -170,7 +158,7 @@ func cellLimiterChild(limit int, markedCells map[int]bool, cluster []cell, u cha
 		return false
 	}
 
-	// you have room to add more cells
+	// you have room to add more cells (depth first?)
 	if len(markedCells) < limit {
 		if valueCount < len(markedCells) {
 			// #TODO# probably fix this? rework into error?
@@ -234,12 +222,12 @@ func cellLimiterChild(limit int, markedCells map[int]bool, cluster []cell, u cha
 //  outside of those cells - those values are constrained to those cells.
 func cellLimiter(cluster []cell, u chan cell) (changed bool) {
 	upperBound := len(cluster)
-	for _, eachCell := range cluster{
-		if eachCell.actual != 0{
+	for _, eachCell := range cluster {
+		if eachCell.actual != 0 {
 			upperBound--
 		}
 	}
-	for i :=2; i <= upperBound; i++ {
+	for i := 2; i <= upperBound; i++ {
 		if cellLimiterChild(i, map[int]bool{}, cluster, u) {
 			changed = true
 		}
@@ -265,58 +253,35 @@ func singleCellSolver(index indexedCluster, workingCluster []cell, u chan cell) 
 	return changed
 }
 
-func additionalCost(addVal int, markedVals map[int]bool, index indexedCluster) int {
-	// skip this one if it's already marked
-	if markedVals[addVal] {
-		return -1
-	}
-	var newCols map[int]bool
-	// for target, _ := range index[addVal].targets {
-	for target, _ := range index[addVal] {
-		newCols[target] = true
-	}
-	for preIndexed, _ := range markedVals {
-		// for target, _ := range index[preIndexed].targets {
-		for target, _ := range index[preIndexed] {
-			delete(newCols, target)
+// A helper function to determine the number of cells hit by working across a map
+// of values.
+func valuesCost(markedVals map[int]bool, index indexedCluster, cluseter []cell) int {
+	var neededCells map[int]bool
+	for value, _ := range markedVals {
+		for oneCell, _ := range index[value] {
+			neededCells[oneCell] = true
 		}
 	}
-	return len(newCols)
+	return len(neededCells)
 }
 
-// Given certain premarked values, searches an index to find the next value to
-// mark while staying under the given budget. If something is found to match
-// the required values under the squares budget, changes are made.
-func findPairsChild(markedVals map[int]bool, budget, required int, index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
-	for possibleVal, locations := range index {
-		if markedVals[possibleVal] {
-			// this cell is already on the list, so skip it
-			continue
-		}
-		// if len(locations.targets) > budget {
-		if len(locations) > budget {
-			// adding this cell will never fit in the budget, so skip it
-			continue
-		}
-		// you can't add anything, so return false
-		if budget < 1 {
-			return false
-		}
-		if deduction := additionalCost(possibleVal, markedVals, index); deduction < budget {
-			markedValsCopy := markedVals // #TODO# map copy
-			markedValsCopy[possibleVal] = true
-			// if you already have the hit, mark it
-			if required >= len(markedValsCopy) {
-				if processSquares() {
-
-				}
-
-			}
-
-			// if you need to go down recursively, do it
-			if findPairsChild(makredValsCopy, budget-deduction, required, index, workingCluster) {
-				return true
-			}
-		}
+func valueLimiterChild(limit int, markedValues map[int]bool, index indexedCluster,
+	cluster []cell, u chan cell) (changed bool) {
+	if len(markedValues) > limit {
+		// we have marked more values
+		return false
 	}
+	currentCost := valuesCost(markedVals, index, cluster)
+	if currentCost > limit {
+		// you're over the budget to spend
+		return false
+	}
+
+}
+
+// THis covers rule 7 from above:
+// 7) If any x values have only x possible cells, those cells only have those
+//  possible values - those cells are constrained to those values.
+func valueLimiter(index indexedCluster, cluster []cell, u chan cell) (changed bool) {
+
 }
