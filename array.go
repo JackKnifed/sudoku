@@ -4,6 +4,21 @@ import (
 	"sort"
 )
 
+func dedupArr(arr []int) []int {
+	localArr := make([]int, len(arr))
+	copy(localArr, arr)
+	sort.Ints(localArr)
+	for i := 0; i < len(localArr)-1; i++ {
+		if localArr[i] == localArr[i+1] {
+			localArr = append(localArr[:i], localArr[i+1:]...)
+		}
+	}
+	if localArr[len(localArr)-2] == localArr[len(localArr)-1] {
+		localArr = localArr[:len(localArr)-1]
+	}
+	return localArr
+}
+
 // Holds some functions needed for working with arrays
 
 func inArr(val int, arr []int) bool {
@@ -36,11 +51,11 @@ func addArr(add, arr []int) []int {
 		} else if add[i] < arr[j] {
 			i++
 		} else if add[i] > arr[i] {
-			arr = append(arr[:j], add[i], arr[j:]...)
+			arr = append(arr[:j], append(add[i:i], arr[j:]...)...)
 			j++
 		}
 	}
-	arr = defupArr(arr)
+	arr = dedupArr(arr)
 	return arr
 }
 
@@ -50,7 +65,7 @@ func subArr(sub, arr []int) []int {
 	var i, j int
 	for i < len(sub) && j < len(arr)-1 {
 		if sub[i] == arr[j] {
-			arr = append(arr[:j], arr[j+1]...)
+			arr = append(arr[:j], arr[:j+1]...)
 		} else if sub[i] < arr[j] {
 			i++
 		} else {
@@ -60,21 +75,20 @@ func subArr(sub, arr []int) []int {
 	return arr
 }
 
-func dedupArr(arr []int) []int {
-	sort.Ints(arr)
-	for i := 0; i < len(arr)-1; i++ {
-		if arr[i] == arr[i+1] {
-			arr = append(arr[:i], arr[i+1:]...)
-		}
-	}
-	return arr
-}
-
 func andArr(a, b []int) []int {
 	var output []int
-	for i := 0; i < len(a); i++ {
-		for j := 0; j < len(b); j++ {
-
+	a = dedupArr(a)
+	b = dedupArr(b)
+	var i, j int
+	for i < len(a) && j < len(b) {
+		if a[i] == b[j] {
+			output = append(output, a[i])
+			i++
+		} else if a[i] < b[j] {
+			i++
+		} else {
+			j++
 		}
 	}
+	return output
 }

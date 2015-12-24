@@ -271,17 +271,19 @@ func valueLimiterChild(limit int, markedValues map[int]bool, index indexedCluste
 		// we have marked more values
 		return false
 	}
-	currentCost := valuesCost(markedVals, index, cluster)
+	currentCost := valuesCost(markedValues, index, cluster)
 	if currentCost > limit {
 		// you're over the budget to spend
 		return false
 	}
-
+	return changed
 }
 
 // THis covers rule 7 from above:
 // 7) If any x values have only x possible cells, those cells only have those
 //  possible values - those cells are constrained to those values.
+/*
 func valueLimiter(index indexedCluster, cluster []cell, u chan cell) (changed bool) {
 
 }
+*/
