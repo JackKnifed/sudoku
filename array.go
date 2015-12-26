@@ -66,13 +66,15 @@ func subArr(a, b []int) []int {
 	b = dedupArr(b)
 	a = dedupArr(a)
 	var i, j int
-	for i < len(b) && j < len(a)-1 {
-		if b[i] == a[j] {
-			a = append(a[:j], a[:j+1]...)
-		} else if b[i] < a[j] {
+	for i < len(a) && j < len(b) {
+		if a[i] < b[j] {
 			i++
-		} else {
+		} else if a[i] > b[j] {
 			j++
+		} else if i+1 < len(a) {
+			a = append(a[:i], a[i+1:]...)
+		} else {
+			a = a[:i]
 		}
 	}
 	return a
