@@ -30,7 +30,7 @@ type indexedCluster map[int]intArray
 
 func indexCluster(in []cell) (out indexedCluster) {
 	for id, each := range in {
-		for onePossible, _ := range each.possible {
+		for _, onePossible_ := range each.possible {
 			out[onePossible] = append(out[onePossible], id)
 		}
 	}

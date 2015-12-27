@@ -19,23 +19,18 @@ type coord struct {
 type cell struct {
 	location coord
 	actual   int
-	possible map[int]bool
+	possible []int
 }
 
-func createBoard(level int) map[coord]cell {
-	var cleanCell cell
-	// initialize one cell
-	for i := 1; i <= level*level; i++ {
-		cleanCell.possible[i] = true
-	}
-
-	var board map[coord]cell
-	for i := 1; i <= level*level; i++ {
-		for j := 1; j <= level*level; j++ {
-			board[coord{x: i, y: j}] = cleanCell
+func createBoard(level int) (board map[coord]cell) {
+	for i := 0; i < level*level; i++ {
+		for j := 0; j < level*level; j++ {
+			board[coord{x:i, y:j}].location = coord{x:i, y:j}
+			for k := 1; k =< level*level; k++ {
+				board[coord{x:i, y:j}].possible = append(board[coord{x:i, y:j}].possible, k) 
+			}
 		}
 	}
-
 	return board
 }
 
