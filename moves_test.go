@@ -6,6 +6,18 @@ import (
 	"testing"
 )
 
-func loadTests(inputFile, ckeckFile string) (input [][]cell, check [][]cell) {
+func loadCellCluster(inputFile string) ([][]cell, error) {
+	b, err := ioutil.ReadFile(inputFile)
+	if err != nil {
+		return err
+	}
 
+	var v interface{}
+	err = Unmarshal(b, v)
+	if err != nil {
+		return err
+	}
+	return v
 }
+
+func Test
