@@ -22,12 +22,38 @@ type cell struct {
 	possible []int
 }
 
+type Cluster []cell
+
+/*
+type Cluster interface {
+	Len() int
+	Swap(i, j int)
+	Less(i, j int)
+}
+*/
+
+func (c Cluster) Len() int {
+	return len(c)
+}
+func (c Cluster) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+func (c Cluster) Less(i, j int) bool {
+	if c[i].x < c[j].x {
+		return true
+	}
+	if c[i].x == c[j].x && c[i].y < c[j].y {
+		return true
+	}
+	return false
+}
+
 func createBoard(level int) (board map[coord]cell) {
 	for i := 0; i < level*level; i++ {
 		for j := 0; j < level*level; j++ {
-			board[coord{x:i, y:j}].location = coord{x:i, y:j}
-			for k := 1; k =< level*level; k++ {
-				board[coord{x:i, y:j}].possible = append(board[coord{x:i, y:j}].possible, k) 
+			board[coord{x: i, y: j}].location = coord{x: i, y: j}
+			for k := 1; k <= level*level; k++ {
+				board[coord{x: i, y: j}].possible = append(board[coord{x: i, y: j}].possible, k)
 			}
 		}
 	}
