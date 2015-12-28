@@ -244,16 +244,38 @@ func valuesCost(markedVals []int, index indexedCluster) (neededCells []int) {
 	return len(cellsPainted(markedVals, index))
 }
 
-func valueLimiterChild(limit int, markedValues map[int]bool, index indexedCluster,
+func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 	cluster []cell, u chan cell) (changed bool) {
-	if len(markedValues) > limit {
+	cellCount := valuesCost(markedVals, index)
+	switch {
+	case cellCount < len(markedValues):
+		panic("less cells available than the values that need to go in them")
+	case len(markedValues) > limit:
 		// we have marked more values
 		return false
-	}
-	currentCost := valuesCost(markedValues, index, cluster)
-	if currentCost > limit {
-		// you're over the budget to spend
-		return false
+	case cellCount == len(markedValues):
+		// you have exactly as many values as cells
+		cellsCovered := cellsPainted(markedValues, index)
+		for id, each := range cellsCovered {
+			if toRemove := arrSub(each.possible, markedValues); len(toRemove) > 0 {
+				u <- cell{
+					location: each.location,
+					possible: toRemove,
+				}
+				changed = true
+			}
+		}
+	case len(markedValues) < limit:
+		// you can mark another value and see where that gets you
+		for value, _ := range index {
+			if inArr(markedValues, value) {
+				// this value is already marked
+				continue
+			}
+			// decend down into looking at that value
+			changed = valueLimiterChild(limit, append(markedValues, value),
+				index, cluster, u) || changed
+		}
 	}
 	return changed
 }
@@ -261,8 +283,10 @@ func valueLimiterChild(limit int, markedValues map[int]bool, index indexedCluste
 // THis covers rule 7 from above:
 // 7) If any x values have only x possible cells, those cells only have those
 //  possible values - those cells are constrained to those values.
-/*
 func valueLimiter(index indexedCluster, cluster []cell, u chan cell) (changed bool) {
-
+	upperBound := len(index)
+	for i := 2; i <= upperBound; i++ {
+		changed = valueLimiterCHild(i, []int{}, index, cluster, u) || changed
+	}
+	return changed
 }
-*/
