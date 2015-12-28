@@ -132,10 +132,16 @@ func cellsCost(markedCells []int, cluster []cell) int {
 	for _, oneCell := range markedCells {
 		neededValues = addArr(neededValues, cluster[oneCell].possible)
 	}
-	return len(neededValues)
+	return neededValues
 }
 
-func cellLimiterChild(limit int, markedCells map[int]bool, cluster []cell, u chan cell) (changed bool) {
+// A helper function to determine the number of valus hit given a specific set
+// of cells.
+func cellsCost(markedCells []int, cluster []cell) int {
+	return len(valuesPainted(markedCells, cluster))
+}
+
+func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell) (changed bool) {
 	valueCount := cellsCost(markedCells, cluster)
 	// you have overspent - it's a no-go
 	if len(markedCells) > limit {
