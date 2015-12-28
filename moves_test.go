@@ -34,15 +34,29 @@ func loadBools(inputFile string) ([]bool, error) {
 	return v
 }
 
+func loadIndex(inputFile string) ([]bool, error) {
+	b, err := ioutil.ReadFile(inputFile)
+	if err != nil {
+		return err
+	}
+
+	var v []indexedCluster
+	err = Unmarshal(b, v)
+	if err != nil {
+		return err
+	}
+	return v
+}
+
 func TestIndexCluster(t *testing.T) {
 	input, err := loadCluster("testdata/moves_input.json")
 	if err != nil {
 		t.FatalF("expected input could not be loaded - %v", err)
 	}
 
-	expected, err := loadCluster("testdata/moves_index.json")
+	expected, err := loadIndex("testdata/moves_index.json")
 	if err != nil {
-		t.FatalF("expected results cound not be loaded - %v", err)
+		t.FatalF("expected cound not be loaded - %v", err)
 	}
 
 	if len(input) != len(expected) {
@@ -61,9 +75,9 @@ func TestClusterSolved(t *testing.T) {
 		t.FatalF("expected input could not be loaded - %v", err)
 	}
 
-	expected, err := loadBools("testdata/moves_index.json")
+	expected, err := loadBools("testdata/moves_one.json")
 	if err != nil {
-		t.FatalF("expected results cound not be loaded - %v", err)
+		t.FatalF("expected cound not be loaded - %v", err)
 	}
 
 	if len(input) != len(expected) {
