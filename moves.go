@@ -86,7 +86,7 @@ func eliminateKnowns(workingCluster []cell, u chan cell) (changed bool) {
 		if anyInArr(each, knownValues) {
 			u <- cell{
 				location: each.location,
-				possible: subArr(each, knownValues)
+				possible: subArr(each, knownValues),
 			}
 			changed = true
 		}
@@ -119,7 +119,7 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 		u <- cell{
 			location: each.location,
 			actual:   each.possible[0],
-			possible: []int{}
+			possible: []int{},
 		}
 	}
 	return changed
@@ -141,6 +141,10 @@ func cellsCost(markedCells []int, cluster []cell) int {
 
 func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell) (changed bool) {
 	valueCount := cellsCost(markedCells, cluster)
+	if valueCount < len(markedCells) {
+		// #TODO# probably fix this? rework into error?
+		panic("less possible values than squares to fill")
+	}
 	// you have overspent - it's a no-go
 	if len(markedCells) > limit {
 		return false
@@ -148,27 +152,23 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 
 	// did you fill the cells? if so, mark it
 	if valueCount == len(markedCells) {
+		valuesCovered := valuesPainted(markedCells, cluster)
 		// it's a match - so remove values
-		for idCell, oneCell := range cluster {
-			if oneCell.actual != 0 {
+		for id, each := range cluster {
+			if each.actual != 0 {
 				// already solved
 				continue
 			}
-			if markedCells[idCell] {
+			if inArr(markedCells, id) {
 				// this cell is a part of the list - no exclusions needed
 				continue
 			}
-			remove := map[int]bool{}
-			for potential, _ := range oneCell.possible {
-				if markedCells[idCell] {
-					// this possibility exists in the map - need to remove it
-					remove[potential] = true
-				}
-			}
-			if len(remove) > 0 {
+
+			toRemove := andArr(each.possible, valuesCovered)
+			if len(toRemove) > 0 {
 				changed = true
 				u <- cell{
-					location: oneCell.location,
+					location: each.location,
 					possible: remove,
 				}
 			}
@@ -177,29 +177,18 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 
 	// you have room to add more cells (depth first?)
 	if len(markedCells) < limit {
-		if valueCount < len(markedCells) {
-			// #TODO# probably fix this? rework into error?
-			panic("less possible values than squares to fill")
-		}
-		if valueCount > len(markedCells) {
-			// you need to try adding each other cell
-			for idCell, oneCell := range cluster {
-				if oneCell.actual != 0 {
-					continue
-				}
-				if markedCells[idCell] {
-					// this cell is already in the map, skip
-					continue
-				}
-
-				// decend down into looking at that cell
-				childMarkedCells := markedCells // #TODO# map copy
-				childMarkedCells[idCell] = true
-				if cellLimiterChild(limit, childMarkedCells, cluster, u) {
-					// if you got true from the child, pass it on
-					return true
-				}
+		// you need to try adding each other cell
+		for idCell, oneCell := range cluster {
+			if oneCell.actual != 0 {
+				continue
 			}
+			if inArr(markedCells, idCell) {
+				// this cell is already in the map, skip
+				continue
+			}
+
+			// decend down into looking at that cell
+			changed = changed || cellLimiterChild(limit, append(markedCells, idCell), cluster, u)
 		}
 	}
 
@@ -217,9 +206,7 @@ func cellLimiter(cluster []cell, u chan cell) (changed bool) {
 		}
 	}
 	for i := 2; i <= upperBound; i++ {
-		if cellLimiterChild(i, map[int]bool{}, cluster, u) {
-			changed = true
-		}
+		changed = changed || cellLimiterChild(i, []int{}, cluster, u)
 	}
 	return changed
 }
