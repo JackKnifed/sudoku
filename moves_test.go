@@ -48,6 +48,24 @@ func loadIndex(inputFile string) ([]bool, error) {
 	return v
 }
 
+func sortResponses(in, out chan cell) {
+	defer close(out)
+	more := true
+	var updates Cluster
+	var val cell
+	for more {
+		val, more = <-in
+		if more {
+			updates = append(updates, val)
+		}
+	}
+	sort.Sort(updates)
+	for _, each := range updates {
+		out <- each
+	}
+	return
+}
+
 func TestIndexCluster(t *testing.T) {
 	input, err := loadCluster("testdata/moves_input.json")
 	if err != nil {
