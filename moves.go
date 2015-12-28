@@ -141,17 +141,17 @@ func cellsCost(markedCells []int, cluster []cell) int {
 
 func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell) (changed bool) {
 	valueCount := cellsCost(markedCells, cluster)
-	if valueCount < len(markedCells) {
+	switch {
+
+	case valueCount < len(markedCells):
 		// #TODO# probably fix this? rework into error?
 		panic("less possible values than squares to fill")
-	}
 	// you have overspent - it's a no-go
-	if len(markedCells) > limit {
+	case len(markedCells) > limit:
 		return false
-	}
 
 	// did you fill the cells? if so, mark it
-	if valueCount == len(markedCells) {
+	case valueCount == len(markedCells):
 		valuesCovered := valuesPainted(markedCells, cluster)
 		// it's a match - so remove values
 		for id, each := range cluster {
@@ -173,10 +173,8 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 				}
 			}
 		}
-	}
-
 	// you have room to add more cells (depth first?)
-	if len(markedCells) < limit {
+	case len(markedCells) < limit:
 		// you need to try adding each other cell
 		for idCell, oneCell := range cluster {
 			if oneCell.actual != 0 {
@@ -191,7 +189,6 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 			changed = changed || cellLimiterChild(limit, append(markedCells, idCell), cluster, u)
 		}
 	}
-
 	return changed
 }
 
