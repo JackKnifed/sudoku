@@ -230,16 +230,18 @@ func singleCellSolver(index indexedCluster, cluster []cell, u chan cell) (change
 	return changed
 }
 
+// A helper function to determine what cells are painted by given values
+func cellsPainted(markedVals []int, index indexedCluster) (neededCells []int) {
+	for _, value := range markedVals {
+		neededCells = addArr(neededCells, index[value])
+	}
+	return neededCells
+}
+
 // A helper function to determine the number of cells hit by working across a map
 // of values.
-func valuesCost(markedVals map[int]bool, index indexedCluster, cluseter []cell) int {
-	var neededCells map[int]bool
-	for value, _ := range markedVals {
-		for oneCell, _ := range index[value] {
-			neededCells[oneCell] = true
-		}
-	}
-	return len(neededCells)
+func valuesCost(markedVals []int, index indexedCluster) (neededCells []int) {
+	return len(cellsPainted(markedVals, index))
 }
 
 func valueLimiterChild(limit int, markedValues map[int]bool, index indexedCluster,
