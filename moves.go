@@ -127,12 +127,10 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 
 // A helper function to determine the number of valus hit given a specific set
 // of cells.
-func cellsCost(markedCells map[int]bool, cluster []cell) int {
-	var neededValues map[int]bool
-	for cellPos, _ := range markedCells {
-		for possibleValue, _ := range cluster[cellPos].possible {
-			neededValues[possibleValue] = true
-		}
+func cellsCost(markedCells []int, cluster []cell) int {
+	var neededValues []int
+	for _, oneCell := range markedCells {
+		neededValues = addArr(neededValues, cluster[oneCell].possible)
 	}
 	return len(neededValues)
 }
