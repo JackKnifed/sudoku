@@ -223,15 +223,16 @@ func cellLimiter(cluster []cell, u chan cell) (changed bool) {
 
 // This covers rule 6 from above:
 // 6) If any value only has one possible cell, that is that cell's value.
-func singleCellSolver(index indexedCluster, workingCluster []cell, u chan cell) (changed bool) {
+func singleCellSolver(index indexedCluster, cluster []cell, u chan cell) (changed bool) {
 	for val, section := range index {
 		if len(section) < 1 {
 			// something went terribly wrong here - #TODO# add panic catch?
 			panic("Found an unsolved cell with no possible values")
 		} else if len(section) == 1 {
 			u <- cell{
-				location: workingCluster[section[0]].location,
+				location: cluster[section[0]].location,
 				actual:   val,
+				possible: []int{},
 			}
 			changed = true
 		}
