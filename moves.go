@@ -72,32 +72,23 @@ func solvedNoPossible(cluster []cell, u chan cell) (changed bool) {
 // Removes known values from other possibles in the same cluster
 // Covers rule 3 from above:
 // 3) If any cell is solved, that value is not possible in other cells.
-func eliminateKnowns(workingCluster []cell, u chan cell) bool {
-	var solved map[int]bool
-	var remove map[int]bool
-	var changed bool
+func eliminateKnowns(workingCluster []cell, u chan cell) (changed bool) {
+	var knownValues []int
 
 	// Loop thru and find all solved values.
 	for _, each := range workingCluster {
 		if each.actual != 0 {
-			solved[each.actual] = true
+			knownValues = append(knownValues, each.actual)
 		}
 	}
 
 	for _, each := range workingCluster {
-		for i, potential := range each.possible {
-			if potential && solved[i] {
-				remove[i] = true
-			}
-		}
-		if len(remove) > 0 {
-			// send back removal of possibles & reset
-			changed = true
+		if anyInArr(each, knownValues) {
 			u <- cell{
 				location: each.location,
-				possible: remove,
+				possible: subArr(each, knownValues)
 			}
-			remove = map[int]bool{}
+			changed = true
 		}
 	}
 	return changed
