@@ -97,34 +97,29 @@ func eliminateKnowns(workingCluster []cell, u chan cell) (changed bool) {
 // This covers the 4th rule from above:
 // 4) If any cell only has one possible value, that is that cell's value.
 func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
-	for _, workingCell := range cluster {
+	for _, each := range cluster {
 		// if the cell is already solved, skip this.
-		if workingCell.actual != 0 {
+		if each.actual != 0 {
 			continue
 		}
 
 		// if there is more than one possible value for this cell, you should be good
-		if len(workingCell.possible) > 1 {
+		if len(each.possible) > 1 {
 			continue
 		}
 
 		// should never happen - probably #TODO# to catch this
-		if len(workingCell.possible) < 1 {
+		if len(each.possible) < 1 {
 			panic("Found an unsolved cell with no possible values")
 		}
 
 		changed = true
 
-		// this empty for loop will set value to each key in the map
-		// since there's one key, it gives me that one key
-		var key int
-		for key, _ = range workingCell.possible {
-		}
-
 		// send back an update for this cell
 		u <- cell{
-			location: workingCell.location,
-			actual:   key,
+			location: each.location,
+			actual:   each.possible[0],
+			possible: []int{}
 		}
 	}
 	return changed
