@@ -125,10 +125,8 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 	return changed
 }
 
-// A helper function to determine the number of valus hit given a specific set
-// of cells.
-func cellsCost(markedCells []int, cluster []cell) int {
-	var neededValues []int
+// A helper function to determine the values certain cells hit
+func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
 	for _, oneCell := range markedCells {
 		neededValues = addArr(neededValues, cluster[oneCell].possible)
 	}
@@ -146,34 +144,6 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 	// you have overspent - it's a no-go
 	if len(markedCells) > limit {
 		return false
-	}
-
-	// you have room to add more cells (depth first?)
-	if len(markedCells) < limit {
-		if valueCount < len(markedCells) {
-			// #TODO# probably fix this? rework into error?
-			panic("less possible values than squares to fill")
-		}
-		if valueCount > len(markedCells) {
-			// you need to try adding each other cell
-			for idCell, oneCell := range cluster {
-				if oneCell.actual != 0 {
-					continue
-				}
-				if markedCells[idCell] {
-					// this cell is already in the map, skip
-					continue
-				}
-
-				// decend down into looking at that cell
-				childMarkedCells := markedCells // #TODO# map copy
-				childMarkedCells[idCell] = true
-				if cellLimiterChild(limit, childMarkedCells, cluster, u) {
-					// if you got true from the child, pass it on
-					return true
-				}
-			}
-		}
 	}
 
 	// did you fill the cells? if so, mark it
@@ -204,6 +174,35 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 			}
 		}
 	}
+
+	// you have room to add more cells (depth first?)
+	if len(markedCells) < limit {
+		if valueCount < len(markedCells) {
+			// #TODO# probably fix this? rework into error?
+			panic("less possible values than squares to fill")
+		}
+		if valueCount > len(markedCells) {
+			// you need to try adding each other cell
+			for idCell, oneCell := range cluster {
+				if oneCell.actual != 0 {
+					continue
+				}
+				if markedCells[idCell] {
+					// this cell is already in the map, skip
+					continue
+				}
+
+				// decend down into looking at that cell
+				childMarkedCells := markedCells // #TODO# map copy
+				childMarkedCells[idCell] = true
+				if cellLimiterChild(limit, childMarkedCells, cluster, u) {
+					// if you got true from the child, pass it on
+					return true
+				}
+			}
+		}
+	}
+
 	return changed
 }
 
