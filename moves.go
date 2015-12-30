@@ -39,7 +39,7 @@ func indexCluster(in []cell) (out indexedCluster) {
 
 // This covers rule 1 from above:
 // 1) If all cells are solved, that cluster is solved.
-func clusterSolved(cluster []cell, u chan cell) (solved bool) {
+func clusterSolved(cluster []cell) (solved bool) {
 	solved = true
 	for _, each := range cluster {
 		if each.actual == 0 {
@@ -53,26 +53,21 @@ func clusterSolved(cluster []cell, u chan cell) (solved bool) {
 
 // This covers rule 2 from above:
 // 2) If any cell is solved, it has no possibles.
-func solvedNoPossible(cluster []cell, u chan cell) (changed bool) {
+func solvedNoPossible(cluster []cell) (changes []cell) {
 	for _, each := range cluster {
 		if each.actual == 0 {
 			continue
 		}
 		if len(each.possible) > 0 {
-			changed = true
-			u <- cell{
-				location: each.location,
-				possible: each.possible,
-			}
+			changes = append(changes, cell{location: each.location, possible: each.possible})
 		}
 	}
-	return changed
 }
 
 // Removes known values from other possibles in the same cluster
 // Covers rule 3 from above:
 // 3) If any cell is solved, that value is not possible in other cells.
-func eliminateKnowns(workingCluster []cell, u chan cell) (changed bool) {
+func eliminateKnowns(workingCluster []cell) (changes []cell) {
 	var knownValues []int
 
 	// Loop thru and find all solved values.
@@ -84,27 +79,19 @@ func eliminateKnowns(workingCluster []cell, u chan cell) (changed bool) {
 
 	for _, each := range workingCluster {
 		if anyInArr(each, knownValues) {
-			u <- cell{
+			changes = append(changes, cell{
 				location: each.location,
 				possible: subArr(each, knownValues),
-			}
-			changed = true
+			})
 		}
 	}
-	return changed
 }
 
 // This covers the 4th rule from above:
 // 4) If any cell only has one possible value, that is that cell's value.
-func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
+func singleValueSolver(cluster []cell) (changes []cell) {
 	for _, each := range cluster {
-		// if the cell is already solved, skip this.
-		if each.actual != 0 {
-			continue
-		}
-
-		// if there is more than one possible value for this cell, you should be good
-		if len(each.possible) > 1 {
+		if each.actual == 0 {
 			continue
 		}
 
@@ -113,14 +100,12 @@ func singleValueSolver(cluster []cell, u chan cell) (changed bool) {
 			panic("Found an unsolved cell with no possible values")
 		}
 
-		changed = true
-
-		// send back an update for this cell
-		u <- cell{
-			location: each.location,
-			actual:   each.possible[0],
-			possible: []int{},
+		if len(each.possible) == 1 {
+			// send back an update for this cell
+			changes = append(changes, cell{location: each.location,
+				actual: each.possible[0], possible: []int{}})
 		}
+
 	}
 	return changed
 }
@@ -139,7 +124,7 @@ func cellsCost(markedCells []int, cluster []cell) int {
 	return len(valuesPainted(markedCells, cluster))
 }
 
-func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell) (changed bool) {
+func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []cell) {
 	valueCount := cellsCost(markedCells, cluster)
 	switch {
 
@@ -166,11 +151,10 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 
 			toRemove := andArr(each.possible, valuesCovered)
 			if len(toRemove) > 0 {
-				changed = true
-				u <- cell{
+				changes = append(changes, cell{
 					location: each.location,
 					possible: remove,
-				}
+				})
 			}
 		}
 	// you have room to add more cells (depth first?)
@@ -186,16 +170,17 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell, u chan cell)
 			}
 
 			// decend down into looking at that cell
-			changed = changed || cellLimiterChild(limit, append(markedCells, idCell), cluster, u)
+			changes = append(changes,
+				cellLimiterChild(limit, append(markedCells, idCell), cluster))
 		}
 	}
-	return changed
+	return changes
 }
 
 // This covers rule 5:
 // 5) If any x cells have x possible values, those values are not possible
 //  outside of those cells - those values are constrained to those cells.
-func cellLimiter(cluster []cell, u chan cell) (changed bool) {
+func cellLimiter(cluster []cell) (changes []cell) {
 	upperBound := len(cluster)
 	for _, eachCell := range cluster {
 		if eachCell.actual != 0 {
@@ -203,25 +188,24 @@ func cellLimiter(cluster []cell, u chan cell) (changed bool) {
 		}
 	}
 	for i := 2; i <= upperBound; i++ {
-		changed = changed || cellLimiterChild(i, []int{}, cluster, u)
+		changes = append(changes, cellLimiterChild(i, []int{}, cluster, u))
 	}
 	return changed
 }
 
 // This covers rule 6 from above:
 // 6) If any value only has one possible cell, that is that cell's value.
-func singleCellSolver(index indexedCluster, cluster []cell, u chan cell) (changed bool) {
+func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 	for val, section := range index {
 		if len(section) < 1 {
 			// something went terribly wrong here - #TODO# add panic catch?
 			panic("Found an unsolved cell with no possible values")
 		} else if len(section) == 1 {
-			u <- cell{
+			changes = append(changes, cell{
 				location: cluster[section[0]].location,
 				actual:   val,
 				possible: []int{},
-			}
-			changed = true
+			})
 		}
 	}
 	return changed
@@ -242,7 +226,7 @@ func valuesCost(markedVals []int, index indexedCluster) (neededCells []int) {
 }
 
 func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
-	cluster []cell, u chan cell) (changed bool) {
+	cluster []cell) (changes bool) {
 	cellCount := valuesCost(markedVals, index)
 	switch {
 	case cellCount < len(markedValues):
@@ -255,11 +239,10 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 		cellsCovered := cellsPainted(markedValues, index)
 		for id, each := range cellsCovered {
 			if toRemove := arrSub(each.possible, markedValues); len(toRemove) > 0 {
-				u <- cell{
+				changes = append(changes, cell{
 					location: each.location,
 					possible: toRemove,
-				}
-				changed = true
+				})
 			}
 		}
 	case len(markedValues) < limit:
@@ -270,20 +253,20 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 				continue
 			}
 			// decend down into looking at that value
-			changed = valueLimiterChild(limit, append(markedValues, value),
-				index, cluster, u) || changed
+			changes = append(changes, valueLimiterChild(limit, append(markedValues, value),
+				index, cluster, u))
 		}
 	}
-	return changed
+	return changes
 }
 
 // THis covers rule 7 from above:
 // 7) If any x values have only x possible cells, those cells only have those
 //  possible values - those cells are constrained to those values.
-func valueLimiter(index indexedCluster, cluster []cell, u chan cell) (changed bool) {
+func valueLimiter(index indexedCluster, cluster []cell) (changes []cell) {
 	upperBound := len(index)
 	for i := 2; i <= upperBound; i++ {
-		changed = valueLimiterCHild(i, []int{}, index, cluster, u) || changed
+		changes = append(changes, valueLimiterCHild(i, []int{}, index, cluster))
 	}
-	return changed
+	return changes
 }
