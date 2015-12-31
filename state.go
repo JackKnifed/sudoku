@@ -22,7 +22,11 @@ type cell struct {
 	possible []int
 }
 
-type Cluster []cell
+type ClusterUpdate struct {
+	cells []cell,
+	version int
+}
+
 
 /*
 type Cluster interface {
@@ -127,6 +131,48 @@ func broadcastUpdate(up chan coord, childs []chan coord) {
 		}
 		for _, each := range childs {
 			each <- val
+		}
+	}
+}
+
+func clusterThread(updates chan ClusterUpdate, cluster chan ClusterUpdate, status chan int) {
+	var currentVersion int
+	defer close(status)
+
+	for {
+		select {
+		case status <- currentVersion:
+		case newCluster := <-cluster:
+			currentVersion = newCluster.version
+			var changes []cell
+			if !clusterSolved(cluster) {
+				return
+			}
+
+			newChanges := solvedNoPossible(cluster.cells)
+			changes = append(changes, newChanges)
+
+			newChanges = eliminateKnowns(cluster.cells)
+			changes = append(changes, newChanges)
+
+			newChanges = singleValueSolver(cluster.cells)
+			changes = append(changes, newChanges)
+
+			newChanges = cellLimiter(cluster.cells)
+			changes = append(changes, newChanges)
+
+			index := indexCluster(cluster.cells)
+
+			newChanges = singleCellSolver(index, cluster.cells)
+			changes = append(changes, newChanges)
+
+			newChanges = valueLimiter(index, cluster.cells)
+			changes = append(changes, newChanges)
+
+			updates <- ClusterUpdate{
+				version: currentVersion,
+				cells: changes,
+			}
 		}
 	}
 }
