@@ -30,7 +30,7 @@ type indexedCluster map[int]intArray
 
 func indexCluster(in []cell) (out indexedCluster) {
 	for id, each := range in {
-		for _, onePossible_ := range each.possible {
+		for _, onePossible := range each.possible {
 			out[onePossible] = append(out[onePossible], id)
 		}
 	}
@@ -62,6 +62,7 @@ func solvedNoPossible(cluster []cell) (changes []cell) {
 			changes = append(changes, cell{location: each.location, possible: each.possible})
 		}
 	}
+	return
 }
 
 // Removes known values from other possibles in the same cluster
@@ -78,13 +79,14 @@ func eliminateKnowns(cluster []cell) (changes []cell) {
 	}
 
 	for _, each := range cluster {
-		if anyInArr(each, knownValues) {
+		if len(andArr(each.possible, knownValues)) > 0 {
 			changes = append(changes, cell{
 				location: each.location,
-				possible: subArr(each, knownValues),
+				possible: subArr(each.possible, knownValues),
 			})
 		}
 	}
+	return
 }
 
 // This covers the 4th rule from above:
@@ -107,7 +109,7 @@ func singleValueSolver(cluster []cell) (changes []cell) {
 		}
 
 	}
-	return changed
+	return
 }
 
 // A helper function to determine the values certain cells hit
@@ -133,7 +135,7 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []c
 		panic("less possible values than squares to fill")
 	// you have overspent - it's a no-go
 	case len(markedCells) > limit:
-		return false
+		return []cell{}
 
 	// did you fill the cells? if so, mark it
 	case valueCount == len(markedCells):
@@ -153,7 +155,7 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []c
 			if len(toRemove) > 0 {
 				changes = append(changes, cell{
 					location: each.location,
-					possible: remove,
+					possible: toRemove,
 				})
 			}
 		}
@@ -171,7 +173,7 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []c
 
 			// decend down into looking at that cell
 			changes = append(changes,
-				cellLimiterChild(limit, append(markedCells, idCell), cluster))
+				cellLimiterChild(limit, append(markedCells, idCell), cluster)...)
 		}
 	}
 	return changes
@@ -188,9 +190,9 @@ func cellLimiter(cluster []cell) (changes []cell) {
 		}
 	}
 	for i := 2; i <= upperBound; i++ {
-		changes = append(changes, cellLimiterChild(i, []int{}, cluster, u))
+		changes = append(changes, cellLimiterChild(i, []int{}, cluster)...)
 	}
-	return changed
+	return
 }
 
 // This covers rule 6 from above:
@@ -208,7 +210,7 @@ func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 			})
 		}
 	}
-	return changed
+	return
 }
 
 // A helper function to determine what cells are painted by given values
@@ -216,18 +218,18 @@ func cellsPainted(markedVals []int, index indexedCluster) (neededCells []int) {
 	for _, value := range markedVals {
 		neededCells = addArr(neededCells, index[value])
 	}
-	return neededCells
+	return
 }
 
 // A helper function to determine the number of cells hit by working across a map
 // of values.
-func valuesCost(markedVals []int, index indexedCluster) (neededCells []int) {
+func valuesCost(markedVals []int, index indexedCluster) int {
 	return len(cellsPainted(markedVals, index))
 }
 
 func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 	cluster []cell) (changes bool) {
-	cellCount := valuesCost(markedVals, index)
+	cellCount := valuesCost(markedValues, index)
 	switch {
 	case cellCount < len(markedValues):
 		panic("less cells available than the values that need to go in them")
@@ -238,7 +240,7 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 		// you have exactly as many values as cells
 		cellsCovered := cellsPainted(markedValues, index)
 		for id, each := range cellsCovered {
-			if toRemove := arrSub(each.possible, markedValues); len(toRemove) > 0 {
+			if toRemove := subArr(each.possible, markedValues); len(toRemove) > 0 {
 				changes = append(changes, cell{
 					location: each.location,
 					possible: toRemove,
@@ -257,7 +259,7 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 				index, cluster, u))
 		}
 	}
-	return changes
+	return
 }
 
 // THis covers rule 7 from above:

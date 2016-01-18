@@ -7,6 +7,14 @@ package sudoku
 // * A channel to notify threads of updates
 // * A channel to update known & possible values
 
+import "math"
+
+const (
+	boardRow    = 0
+	boardCol    = 1
+	boardSquare = 2
+)
+
 // coord contains x and y elements for a given position
 type coord struct {
 	x int
@@ -22,11 +30,17 @@ type cell struct {
 	possible []int
 }
 
-type ClusterUpdate struct {
-	cells []cell,
-	version int
+type cluster []cell
+
+type board struct {
+	size     int
+	clusters []cluster
 }
 
+type ClusterUpdate struct {
+	cells   []cell
+	version int
+}
 
 /*
 type Cluster interface {
@@ -52,32 +66,114 @@ func (c Cluster) Less(i, j int) bool {
 	return false
 }
 
-func createBoard(level int) (board map[coord]cell) {
-	for i := 0; i < level*level; i++ {
-		for j := 0; j < level*level; j++ {
+func createBoard(size int) board {
+	var newBoard board
+	newBoard.size = size
+	for i := 0; i < size*size; i++ {
+		for j := 0; j < size*size; j++ {
 			board[coord{x: i, y: j}].location = coord{x: i, y: j}
-			for k := 1; k <= level*level; k++ {
+			for k := 1; k <= size*size; k++ {
 				board[coord{x: i, y: j}].possible = append(board[coord{x: i, y: j}].possible, k)
 			}
 		}
 	}
-	return board
+	return newBoard
+}
+
+func getPos(position coord, orientation, size int) (int, error) {
+	if position.x >= size*size {
+		return -1, errors.New("x position is larger than the board")
+	}
+	if position.y >= size*size {
+		return -1, errors.New("y position is larger than the board")
+	}
+	switch orientation {
+	case boardRow:
+		return position.x
+	case boardCol:
+		return position.y
+	case boardSquare:
+		return ((position.y / size) * size) + (position.x / size)
+	default:
+		return -1, errors.New("bad position")
+	}
+}
+
+func clusterPicker(in board, orient int, position coord) (cluster, error) {
+	if position.x >= len(in) {
+		return cluster{}, errors.New("x coord out of range")
+	} else if position.y >= len(in) {
+		return cluster{}, errors.New("y coord out of range")
+	}
+	switch orient {
+	case boardRow:
+		return in[position.y], nil
+	case boardCol:
+		var result cluster
+		for _, each := range in {
+			result = append(result, each[position.x])
+		}
+		return outCluster, nil
+	case boardSquare:
+		var result cluster
+		boardSize := int(math.Sqrt(len(board)))
+		startX := (position.x / boardSize) * boardSize
+		endX := ((position.x / boardSize) + 1) * boardSize
+		startY := (position.y / boardSize) * boardSize
+		endY := ((position.y / boardSize) + 1) * boardSize
+		for x := startX; x < endX; x++ {
+			for y := startY; y < endY; y++ {
+				result = append(result, in[x][y])
+			}
+		}
+		return result, nil
+	default:
+		return cluster{}, errors.New("bad orientation")
+	}
+}
+
+func boardFilter(update <-chan coord, in <-chan board, out [][]chan<- cluster, status [][]chan<- struct{}) {
+
+	var toWork cluster
+	defer closeArrArrChan(out)
+	// don't actually do anything until you have a board state to work with
+	<-in
+	for {
+		select {
+		case changed, more := <-update:
+			if !more {
+				return
+			}
+			for i = boardRow; i <= boardSquare; i++ {
+				curBoard := <-in
+				if _, open := <-status[i][getPos(changed, i, curBoard.size)]; !open {
+					// skip this update if the cluster is already solved
+					continue
+				}
+				toWork, err := clusterPicker(curBoard, i, changed)
+				if err != nil {
+					panic(err) // #TODO# replace this panic
+				}
+				out[i][getPos(changed, i, curBoard.size)] <- toWork
+			}
+		}
+	}
 }
 
 // The boardQueue is run in a go thread
 // It serves a given value to any requestor whenever asked, or recieves updates to the value to serve.
-func boardQueue(up, down chan map[coord]cell) {
-	currentBoard := <-up
+func boardCache(in <-chan board, out chan<- board) {
+	currentBoard := <-in
 	var done bool
-	defer close(down)
+	defer close(out)
 
 	for {
 		select {
-		case currentBoard, done = <-up:
+		case currentBoard, done = <-in:
 			if done {
 				return
 			}
-		case down <- currentBoard:
+		case out <- currentBoard:
 		}
 	}
 }
@@ -135,7 +231,9 @@ func broadcastUpdate(up chan coord, childs []chan coord) {
 	}
 }
 
-func clusterThread(updates chan ClusterUpdate, cluster chan ClusterUpdate, status chan int) {
+func clusterFilter(in <-chan board)
+
+func cluster(updates chan ClusterUpdate, cluster chan ClusterUpdate, status chan int) {
 	var currentVersion int
 	defer close(status)
 
@@ -171,7 +269,7 @@ func clusterThread(updates chan ClusterUpdate, cluster chan ClusterUpdate, statu
 
 			updates <- ClusterUpdate{
 				version: currentVersion,
-				cells: changes,
+				cells:   changes,
 			}
 		}
 	}
