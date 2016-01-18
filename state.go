@@ -213,7 +213,7 @@ func updateBuffer(in <-chan cell, out chan<- cell) {
 // boardCache serves a given (or newer) update out as many times as requested
 // closes `out` on exit
 // exits when in `is` closed
-func boardCache(in <-chan board, out chan<- board) {
+func boardCache(in chan board, out chan<- board) {
 	currentBoard := <-in
 	var done bool
 	defer close(out)
@@ -224,6 +224,7 @@ func boardCache(in <-chan board, out chan<- board) {
 			if done {
 				return
 			}
+		case in <- currentBoard:
 		case out <- currentBoard:
 		}
 	}
@@ -313,4 +314,11 @@ func clusterWorker(in <-chan cluster, status chan<- struct{}, updates chan<- cel
 			// report idle only if there is nothing to do - order matters
 		}
 	}
+}
+
+//
+func updateProcessor(curBoard chan board, status <-chan struct{}, updates <-chan cell, posChange chan<- coord, problems <-chan error) {
+	defer close(curBoard)
+	defer close(posChange)
+
 }
