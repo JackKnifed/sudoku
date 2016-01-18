@@ -37,11 +37,6 @@ type board struct {
 	clusters []cluster
 }
 
-type ClusterUpdate struct {
-	cells   []cell
-	version int
-}
-
 /*
 type Cluster interface {
 	Len() int
@@ -132,7 +127,7 @@ func clusterPicker(in board, orient int, position coord) (cluster, error) {
 	}
 }
 
-func boardFilter(update <-chan coord, in <-chan board, out [][]chan<- cluster, status [][]chan<- struct{}) {
+func clusterFilter(update <-chan coord, in <-chan board, out [][]chan<- cluster, status [][]<-chan struct{}) {
 
 	var toWork cluster
 	defer closeArrArrChan(out)
@@ -146,22 +141,78 @@ func boardFilter(update <-chan coord, in <-chan board, out [][]chan<- cluster, s
 			}
 			for i = boardRow; i <= boardSquare; i++ {
 				curBoard := <-in
-				if _, open := <-status[i][getPos(changed, i, curBoard.size)]; !open {
+				position := getPos(changed, i, curBoard.size)
+				if _, open := <-status[i][position]; !open {
 					// skip this update if the cluster is already solved
 					continue
 				}
-				toWork, err := clusterPicker(curBoard, i, changed)
+				curCluster, err := clusterPicker(curBoard, i, changed)
 				if err != nil {
 					panic(err) // #TODO# replace this panic
 				}
-				out[i][getPos(changed, i, curBoard.size)] <- toWork
+				out[i][position] <- curCluster
 			}
 		}
 	}
 }
 
-// The boardQueue is run in a go thread
-// It serves a given value to any requestor whenever asked, or recieves updates to the value to serve.
+// takes an input and sends it out as it can
+// exits when in is closed
+// closes out on exit
+func clusterSticky(in <-chan cluster, out chan<- cluster) {
+	var more bool
+	defer close(out)
+
+	// preload the locCluster - don't do anything until you have that
+	locCluster := <-in
+	for {
+		select {
+		case locCluster, more = <-in:
+			// if you get an update from upstream, do that first
+			if !more {
+				return
+			}
+		// pass the update downstream then block till you get another update from upstream
+		case out <- locCluster:
+			locCluster = <-in
+		}
+	}
+}
+
+// like a buffered channel, but no limit to the buffer size
+// closes out on exit
+// exits when in is closed
+func updateBuffer(in <-chan cell, out chan<- cell) {
+	var updates []interface{}
+	var singleUpdate interface{}
+	var open bool
+	defer close(out)
+
+	for {
+		if len(updates) < 1 {
+			// if you currently don't have anything to pass, WAIT FOR SOMETHING
+			singleUpdate, open = <-in
+			if !open {
+				return
+			}
+			updates = append(updates, singleUpdate)
+			continue
+		}
+		select {
+		case singleUpdate, open = <-in:
+			if !open {
+				return
+			}
+			updates = append(updates, singleUpdate)
+		case out <- updates[0]:
+			updates = updates[1:]
+		}
+	}
+}
+
+// boardCache serves a given (or newer) update out as many times as requested
+// closes `out` on exit
+// exits when in `is` closed
 func boardCache(in <-chan board, out chan<- board) {
 	currentBoard := <-in
 	var done bool
@@ -178,76 +229,62 @@ func boardCache(in <-chan board, out chan<- board) {
 	}
 }
 
-// The updateQueue holds an update and pushes it down stream.
-// It will not push the same update down more than once.
-func updateQueue(up, down chan coord) {
-	var push bool
-	var done bool
-	var val coord
-	defer close(down)
+// looks for a send from all status channels
+// if recieved or closed on all status chan, send on `idle`
+// if all status is closed, close idle and exits
+func idleCheck(status [][]<-chan interface{}, idle chan<- interface{}) {
+	var more, isIdle, isSolved bool
+	defer close(idle)
 
 	for {
-		if push {
-			// Otherwise wait to either push it down, or updates
-			select {
-			case val, done = <-up:
-				if done {
-					return
+	start:
+		isSolved, isIdle = true, true
+		for _, middle := range status {
+			for _, inner := range status {
+				select {
+				case _, more = <-inner:
+					if more {
+						isSolved = false
+					}
+				default:
+					isSolved = false
+					isIdle = false
+					continue start
 				}
-				push = true
-			case down <- val:
-				push = false
 			}
-		} else {
-			// If it's been pushed, wait for upstream.
-			val, done = <-up
-			if done {
-				return
-			}
-			push = true
 		}
-	}
-}
-
-func broadcastUpdate(up chan coord, childs []chan coord) {
-	var val coord
-	var done bool
-
-	// clean up downstream channels
-	defer func() {
-		for _, each := range childs {
-			close(each)
-		}
-	}()
-
-	for {
-		val, done = <-up
-		if done {
+		if isSolved {
 			return
-		}
-		for _, each := range childs {
-			each <- val
+		} else if isIdle {
+			idle <- nil
 		}
 	}
 }
 
-func clusterFilter(in <-chan board)
-
-func cluster(updates chan ClusterUpdate, cluster chan ClusterUpdate, status chan int) {
-	var currentVersion int
+// takes a given cluster, and runs it through all of the moves
+// exits when one of the conditions is met, or when the update channel is closed
+// closes the status channel on exit
+func clusterWorker(in <-chan cluster, status chan<- struct{}, updates chan<- cell, problems chan<- error) {
 	defer close(status)
+
+	var more bool
+	var newCluster cluster
+	var index indexedCluster
+	var changes, newChanges []cell
 
 	for {
 		select {
-		case status <- currentVersion:
-		case newCluster := <-cluster:
-			currentVersion = newCluster.version
-			var changes []cell
-			if !clusterSolved(cluster) {
+		case newCluster, more = <-in:
+			if !more {
+				// if the channel is closed, exit
+				return
+			}
+			if clusterSolved(cluster) {
+				// if the cell is solved, exit
 				return
 			}
 
-			newChanges := solvedNoPossible(cluster.cells)
+			newChanges = solvedNoPossible(cluster.cells)
 			changes = append(changes, newChanges)
 
 			newChanges = eliminateKnowns(cluster.cells)
@@ -259,7 +296,7 @@ func cluster(updates chan ClusterUpdate, cluster chan ClusterUpdate, status chan
 			newChanges = cellLimiter(cluster.cells)
 			changes = append(changes, newChanges)
 
-			index := indexCluster(cluster.cells)
+			index = indexCluster(cluster.cells)
 
 			newChanges = singleCellSolver(index, cluster.cells)
 			changes = append(changes, newChanges)
@@ -267,10 +304,13 @@ func cluster(updates chan ClusterUpdate, cluster chan ClusterUpdate, status chan
 			newChanges = valueLimiter(index, cluster.cells)
 			changes = append(changes, newChanges)
 
-			updates <- ClusterUpdate{
-				version: currentVersion,
-				cells:   changes,
+			// feed all those changes into the update queue
+			for len(changes) > 1 {
+				updates <- changes[0]
+				changes = changes[1:]
 			}
+		case status <- nil:
+			// report idle only if there is nothing to do - order matters
 		}
 	}
 }
