@@ -28,6 +28,7 @@ type cell struct {
 	location coord
 	actual   int
 	possible []int
+	excluded []int
 }
 
 type cluster []cell
@@ -316,9 +317,40 @@ func clusterWorker(in <-chan cluster, status chan<- struct{}, updates chan<- cel
 	}
 }
 
-//
+// processes updates
+// priority is problems, updates, then status checks
 func updateProcessor(curBoard chan board, status <-chan struct{}, updates <-chan cell, posChange chan<- coord, problems <-chan error) {
 	defer close(curBoard)
 	defer close(posChange)
+
+	var newBoard board
+	var err error
+
+	for {
+		select {
+		case err = <-problems:
+			// any errors get top priority
+		case cellChange = <-updates:
+			// any udpates are handled before idle checks
+			newBoard, err = changeBoard(<-curBoard, cellChange)
+		case _, solved = <-status:
+			// status check if neither of the above happens - or solved check
+		}
+	}
+}
+
+func changeBoard(in board, u cell) (out board, err error) {
+	target := in.clusters[u.location.x][u.location.y]
+	if cell.actual != 0 {
+		if target.actual != 0
+		for i = 1; i <= board.level; i++ {
+			cell.excluded = append(cell.excluded, i)
+		}
+		cell.excluded = dedupArr(cell.excluded)
+		in.clusters[cell.location.x][cell.location.y] = cell
+	} else {
+		in.clusters[cell.location.x][cell.location.y].excluded = addArr(board.clusters[cell.location.x][cell.location.y].excluded, cell.excluded)
+	}
+
 
 }
