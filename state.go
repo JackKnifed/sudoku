@@ -330,27 +330,36 @@ func updateProcessor(curBoard chan board, status <-chan struct{}, updates <-chan
 		select {
 		case err = <-problems:
 			// any errors get top priority
+			// do error handling
 		case cellChange = <-updates:
 			// any udpates are handled before idle checks
 			newBoard, err = changeBoard(<-curBoard, cellChange)
+			if err != nil {
+				// do error handling
+			}
 		case _, solved = <-status:
 			// status check if neither of the above happens - or solved check
 		}
 	}
 }
 
-func changeBoard(in board, u cell) (out board, err error) {
-	target := in.clusters[u.location.x][u.location.y]
-	if cell.actual != 0 {
-		if target.actual != 0
-		for i = 1; i <= board.level; i++ {
-			cell.excluded = append(cell.excluded, i)
+func changeBoard(in board, u cell) (board, error) {
+	t := in.clusters[u.location.x][u.location.y]
+	if u.actual != 0 {
+		// this is trying to update the
+		if t.actual != u.actual && t.actual != 0 {
+			return board{}, errors.New("got an update for a solved cell")
 		}
-		cell.excluded = dedupArr(cell.excluded)
-		in.clusters[cell.location.x][cell.location.y] = cell
-	} else {
-		in.clusters[cell.location.x][cell.location.y].excluded = addArr(board.clusters[cell.location.x][cell.location.y].excluded, cell.excluded)
+		t.actual = u.actual
 	}
-
-
+	if len(u.excluded) > 0 {
+		t.excluded = addArr(t.excluded, u.excluded)
+		if len(t.excluded) >= in.level*in.level {
+			return board{}, errors.New("got an update that excludes every possibility")
+		}
+		if t.excluded[0] < 1 || t.excluded[len(t.excluded)-1] > level*level {
+			return board{}, errors.New("got an update that excludes an out of bound value")
+		}
+	}
+	return in, nil
 }
