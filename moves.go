@@ -73,14 +73,11 @@ func clusterSolved(cluster []cell) (solved bool) {
 
 // This covers rule 2 from above:
 // 2) If any cell is solved, it has all exclusions.
-// ##TODO##
 func solvedNoPossible(cluster []cell) (changes []cell) {
-	for _, each := range cluster {
-		if each.actual == 0 {
-			continue
-		}
-		if len(each.possible) > 0 {
-			changes = append(changes, cell{location: each.location, possible: each.possible})
+	for id, each := range cluster {
+		if each.actual != 0 && each.excluded < len(cluster) {
+			newExclusion := subArr(fullArray, each.excluded)
+			changes = append(changes, cell{location: each.location, excluded: newExc})
 		}
 	}
 	return
@@ -89,7 +86,6 @@ func solvedNoPossible(cluster []cell) (changes []cell) {
 // Removes known values from other possibles in the same cluster
 // Covers rule 3 from above:
 // 3) If any cell is solved, that value is excluded in other cells.
-// ##TODO##
 func eliminateKnowns(cluster []cell) (changes []cell) {
 	var knownValues []int
 
@@ -101,11 +97,9 @@ func eliminateKnowns(cluster []cell) (changes []cell) {
 	}
 
 	for _, each := range cluster {
-		if len(andArr(each.possible, knownValues)) > 0 {
-			changes = append(changes, cell{
-				location: each.location,
-				possible: subArr(each.possible, knownValues),
-			})
+		if !allInArr(each.excluded, knownValues){
+			newExclusion := subArr(knownValues, each.excluded)
+			changes = append(changes, cell{location: each.location, excluded: newExc})
 		}
 	}
 	return
@@ -113,24 +107,24 @@ func eliminateKnowns(cluster []cell) (changes []cell) {
 
 // This covers the 4th rule from above:
 // 4) If any cell has all but one excluded value, that is that cell's value.
-// ##TODO##
 func singleValueSolver(cluster []cell) (changes []cell) {
 	for _, each := range cluster {
-		if each.actual == 0 {
+		// skip this cell if it's already solved
+		if each.actual != 0 {
 			continue
 		}
 
 		// should never happen - probably #TODO# to catch this
-		if len(each.possible) < 1 {
-			panic("Found an unsolved cell with no possible values")
+		if len(each.excluded) >= len(cluster) {
+			panic("Found an unsolved cell with all values excluded")
 		}
 
-		if len(each.possible) == 1 {
+		if len(each.excluded) == len(cluster) - 1 {
 			// send back an update for this cell
+			solvedValue := subArr(fullArray, each.excluded)
 			changes = append(changes, cell{location: each.location,
-				actual: each.possible[0], possible: []int{}})
+				actual: solvedValue[0], possible: fullArray})
 		}
-
 	}
 	return
 }
