@@ -44,21 +44,6 @@ func anyInArr(arr, tgt []int) bool {
 // preforms a union of a and b and removes anhy duplicates
 func addArr(a, b []int) []int {
 	return dedupArr(append(a, b...))
-	// a = dedupArr(a)
-	// b = dedupArr(b)
-	// var i, j int
-	// for i < len(a) && j < len(b)-1 {
-	// 	if a[i] == b[j] {
-	// 		j++
-	// 	} else if a[i] < b[j] {
-	// 		i++
-	// 	} else if a[i] > b[i] {
-	// 		b = append(b[:j], append(a[i:i], b[j:]...)...)
-	// 		j++
-	// 	}
-	// }
-	// b = dedupArr(b)
-	// return b
 }
 
 // Subtracts b from a - removing any intersections from a and returning
