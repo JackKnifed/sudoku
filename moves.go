@@ -9,16 +9,16 @@ package sudoku
 // the following rules:
 //
 // 1) If all cells are solved, that cluster is solved.
-// 2) If any cell is solved, it has no possibles.
-// 3) If any cell is solved, that value is not possible in other cells.
-// 4) If any cell only has one possible value, that is that cell's value.
-// 5) If any x cells only have x possible values, those values are not possible
-//  outside of those cells - those values are constrained to those cells.
-// 6) If any value only has one possible cell, that is that cell's value.
-// 7) If any x values only have x possible cells, those cells only have those
-//  possible values - those cells are constrained to those values.
+// 2) If any cell is solved, it has all exclusions.
+// 3) If any cell is solved, that value is excluded in other cells.
+// 4) If any cell has all but one excluded value, that is that cell's value.
+// 5) If any x cells have the same (len - x) excluded values, the missing values
+//  are elsewhere excluded - those values are constrained to those cells.
+// 6) If any value is present in only one cell, that is that cell's value.
+// 7) If any x values are possible in x cells, all other values are excluded in
+//  those cells.
 //
-// Additional Helper functions are included and explained later.
+// Additional Helper functions are included first.
 
 // indexedCLuster is a datatype for an index for the values of the cluster.
 // Each possible value is a key in the map. THe value of each key is an array of
@@ -28,10 +28,30 @@ package sudoku
 type intArray []int
 type indexedCluster map[int]intArray
 
+var fullArray intArray
+
+func init() {
+	for i, _ := range in {
+		fullArray = append(fullArray, i)
+	}
+}
+
+// indexCluster takes a cluster of excluded values, and returns an index of
+//  the possible locations for each value.
 func indexCluster(in []cell) (out indexedCluster) {
-	for id, each := range in {
-		for _, onePossible := range each.possible {
-			out[onePossible] = append(out[onePossible], id)
+
+	// add the fullArray to every value location
+	for i, _ := range in {
+		copy(out[i], fullArray)
+	}
+
+	// I can simply delete known values from the array
+	for id, each := range out {
+		if (each.actual) != 0 {
+			delete(out, id)
+		}
+		for _, oneExcluded := range each.excluded {
+			out[id] = subArr(out[id], []int{oneExcluded})
 		}
 	}
 	return out
@@ -52,7 +72,8 @@ func clusterSolved(cluster []cell) (solved bool) {
 }
 
 // This covers rule 2 from above:
-// 2) If any cell is solved, it has no possibles.
+// 2) If any cell is solved, it has all exclusions.
+// ##TODO##
 func solvedNoPossible(cluster []cell) (changes []cell) {
 	for _, each := range cluster {
 		if each.actual == 0 {
@@ -67,7 +88,8 @@ func solvedNoPossible(cluster []cell) (changes []cell) {
 
 // Removes known values from other possibles in the same cluster
 // Covers rule 3 from above:
-// 3) If any cell is solved, that value is not possible in other cells.
+// 3) If any cell is solved, that value is excluded in other cells.
+// ##TODO##
 func eliminateKnowns(cluster []cell) (changes []cell) {
 	var knownValues []int
 
@@ -90,7 +112,8 @@ func eliminateKnowns(cluster []cell) (changes []cell) {
 }
 
 // This covers the 4th rule from above:
-// 4) If any cell only has one possible value, that is that cell's value.
+// 4) If any cell has all but one excluded value, that is that cell's value.
+// ##TODO##
 func singleValueSolver(cluster []cell) (changes []cell) {
 	for _, each := range cluster {
 		if each.actual == 0 {
@@ -113,6 +136,7 @@ func singleValueSolver(cluster []cell) (changes []cell) {
 }
 
 // A helper function to determine the values certain cells hit
+// ##TODO## review
 func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
 	for _, oneCell := range markedCells {
 		neededValues = addArr(neededValues, cluster[oneCell].possible)
@@ -122,10 +146,12 @@ func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
 
 // A helper function to determine the number of valus hit given a specific set
 // of cells.
+// ##TODO## review
 func cellsCost(markedCells []int, cluster []cell) int {
 	return len(valuesPainted(markedCells, cluster))
 }
 
+// ##TODO## - review
 func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []cell) {
 	valueCount := cellsCost(markedCells, cluster)
 	switch {
@@ -180,8 +206,9 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []c
 }
 
 // This covers rule 5:
-// 5) If any x cells have x possible values, those values are not possible
-//  outside of those cells - those values are constrained to those cells.
+// 5) If any x cells have the same (len - x) excluded values, the missing values
+//  are elsewhere excluded - those values are constrained to those cells.
+// ##TODO##
 func cellLimiter(cluster []cell) (changes []cell) {
 	upperBound := len(cluster)
 	for _, eachCell := range cluster {
@@ -196,7 +223,8 @@ func cellLimiter(cluster []cell) (changes []cell) {
 }
 
 // This covers rule 6 from above:
-// 6) If any value only has one possible cell, that is that cell's value.
+// 6) If any value is present in only one cell, that is that cell's value.
+// ##TODO##
 func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 	for val, section := range index {
 		if len(section) < 1 {
@@ -214,6 +242,7 @@ func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 }
 
 // A helper function to determine what cells are painted by given values
+// ##TODO## review
 func cellsPainted(markedVals []int, index indexedCluster) (neededCells []int) {
 	for _, value := range markedVals {
 		neededCells = addArr(neededCells, index[value])
@@ -223,10 +252,12 @@ func cellsPainted(markedVals []int, index indexedCluster) (neededCells []int) {
 
 // A helper function to determine the number of cells hit by working across a map
 // of values.
+// ##TODO## review
 func valuesCost(markedVals []int, index indexedCluster) int {
 	return len(cellsPainted(markedVals, index))
 }
 
+// ##TODO## review
 func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 	cluster []cell) (changes bool) {
 	cellCount := valuesCost(markedValues, index)
@@ -262,9 +293,10 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 	return
 }
 
-// THis covers rule 7 from above:
-// 7) If any x values have only x possible cells, those cells only have those
-//  possible values - those cells are constrained to those values.
+// This covers rule 7 from above:
+// 7) If any x values are possible in x cells, all other values are excluded in
+//  those cells.
+// ##TODO##
 func valueLimiter(index indexedCluster, cluster []cell) (changes []cell) {
 	upperBound := len(index)
 	for i := 2; i <= upperBound; i++ {
