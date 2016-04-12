@@ -12,8 +12,8 @@ package sudoku
 // 2) If any cell is solved, it has all exclusions.
 // 3) If any cell is solved, that value is excluded in other cells.
 // 4) If any cell has all but one excluded value, that is that cell's value.
-// 5) If any x cells have the same (len - x) excluded values, the missing values
-//  are elsewhere excluded - those values are constrained to those cells.
+// 5) If any x cells have the same x values, the missing values are elsewhere
+//  excluded - those values are constrained to those cells.
 // 6) If any value is present in only one cell, that is that cell's value.
 // 7) If any x values are possible in x cells, all other values are excluded in
 //  those cells.
@@ -200,8 +200,8 @@ func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []c
 }
 
 // This covers rule 5:
-// 5) If any x cells have the same (len - x) excluded values, the missing values
-//  are elsewhere excluded - those values are constrained to those cells.
+// 5) If any x cells have the same x values, the missing values are elsewhere
+//  excluded - those values are constrained to those cells.
 // ##TODO##
 func cellLimiter(cluster []cell) (changes []cell) {
 	upperBound := len(cluster)
@@ -217,7 +217,7 @@ func cellLimiter(cluster []cell) (changes []cell) {
 }
 
 // This covers rule 6 from above:
-// 6) If any value is present in only one cell, that is that cell's value.
+// 6) If any value is possible in only one cell, that is that cell's value.
 // ##TODO##
 func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 	for val, section := range index {
@@ -228,7 +228,7 @@ func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 			changes = append(changes, cell{
 				location: cluster[section[0]].location,
 				actual:   val,
-				possible: []int{},
+				possible: fullArray,
 			})
 		}
 	}
