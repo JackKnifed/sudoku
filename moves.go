@@ -207,17 +207,16 @@ func cellLimiter(cluster []cell) []cell {
 
 // This covers rule 6 from above:
 // 6) If any value is possible in only one cell, that is that cell's value.
-// ##TODO##
 func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 	for val, section := range index {
 		if len(section) < 1 {
 			// something went terribly wrong here - #TODO# add panic catch?
-			panic("Found an unsolved cell with no possible values")
+			panic("Found a value with no possible cells")
 		} else if len(section) == 1 {
 			changes = append(changes, cell{
 				location: cluster[section[0]].location,
 				actual:   val,
-				possible: fullArray,
+				excluded: fullArray,
 			})
 		}
 	}
