@@ -97,7 +97,7 @@ func eliminateKnowns(cluster []cell) (changes []cell) {
 	}
 
 	for _, each := range cluster {
-		if !allInArr(each.excluded, knownValues){
+		if !allInArr(each.excluded, knownValues) {
 			newExclusion := subArr(knownValues, each.excluded)
 			changes = append(changes, cell{location: each.location, excluded: newExc})
 		}
@@ -119,7 +119,7 @@ func singleValueSolver(cluster []cell) (changes []cell) {
 			panic("Found an unsolved cell with all values excluded")
 		}
 
-		if len(each.excluded) == len(cluster) - 1 {
+		if len(each.excluded) == len(cluster)-1 {
 			// send back an update for this cell
 			solvedValue := subArr(fullArray, each.excluded)
 			changes = append(changes, cell{location: each.location,
@@ -131,106 +131,78 @@ func singleValueSolver(cluster []cell) (changes []cell) {
 
 // A helper function to determine the values certain cells hit
 // ##TODO## review
-func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
-	var first, second []int
-	first = cluster[markedCells[0]].excluded
-
+func exclusionsPainted(markedCells []int, cluster []cell) []int {
 	switch {
 	case len(markedCells) < 1:
 		// this will only happen when passed one cell
-		return []int[]
-	case len(markedCells) > 1 :
-		remainder = valuesPainted(markedCells[1:], cluster)
+		return []int{}
+	case len(markedCells) == 1:
+		return cluster[markedCells[0]].excluded
 	default:
-		remainder = cluster[markedCells[1]].excluded
+		var first, second []int
+		first := cluster[markedCells[0]].excluded
+		second := exclusionsPainted(markedCells[1:], cluster)
+		return addArr(first, second)
 	}
-
-	neededValues = subArr(fullArray, andArr(first, second))
-	return
 }
-func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
-	for _, oneCell := range markedCells {
-		neededValues = addArr(neededValues, cluster[oneCell].possible)
-	}
-	return neededValues
+
+func valuesPainted(markedCells []int, cluster []cell) []int {
+	return subArr(fullArray, exclusionsPainted(markedCells, cluster))
 }
 
 // A helper function to determine the number of valus hit given a specific set
 // of cells.
-// ##TODO## review
 func cellsCost(markedCells []int, cluster []cell) int {
 	return len(valuesPainted(markedCells, cluster))
 }
 
-// ##TODO## - review
-func cellLimiterChild(limit int, markedCells []int, cluster []cell) (changes []cell) {
-	valueCount := cellsCost(markedCells, cluster)
+func cellLimiterChild(markedCells, availableCells []int,
+	cluster []cell) (changes []cell) {
 	switch {
-
-	case valueCount < len(markedCells):
-		// #TODO# probably fix this? rework into error?
-		panic("less possible values than squares to fill")
-	// you have overspent - it's a no-go
-	case len(markedCells) > limit:
-		return []cell{}
-
-	// did you fill the cells? if so, mark it
-	case valueCount == len(markedCells):
-		valuesCovered := valuesPainted(markedCells, cluster)
-		// it's a match - so remove values
-		for id, each := range cluster {
-			if each.actual != 0 {
-				// already solved
-				continue
-			}
-			if inArr(markedCells, id) {
-				// this cell is a part of the list - no exclusions needed
-				continue
-			}
-
-			toRemove := andArr(each.possible, valuesCovered)
-			if len(toRemove) > 0 {
-				changes = append(changes, cell{
-					location: each.location,
-					possible: toRemove,
-				})
+	case len(availableCells) < 1:
+		valuesSeen := valuesPainted(markedCells, cluster)
+		if len(valuesSeen) <= len(markedCells) {
+			// check the current marks, if valid, check removal
+			// check other cells for things to remove
+			cellsToClean = subArr(fullArray, markedCells)
+			for _, each := range cellsToClean {
+				valuesToRemove := subArr(valuesSeen, each.excluded)
+				if len(valuesToRemove) > 0 {
+					// if you found something to remove from another cell
+					// create that update
+					changes = append(changes, cell{
+						location: each.location,
+						actual:   each.actual,
+						excluded: valuesToRemove})
+				}
 			}
 		}
-	// you have room to add more cells (depth first?)
-	case len(markedCells) < limit:
-		// you need to try adding each other cell
-		for idCell, oneCell := range cluster {
-			if oneCell.actual != 0 {
-				continue
-			}
-			if inArr(markedCells, idCell) {
-				// this cell is already in the map, skip
-				continue
-			}
+	default:
+		// try a child run without the current cell
+		newChanges := cellLimiterChild(markedCells, availableCells[1:], cluster)
+		changes = append(changes, newChanges...)
 
-			// decend down into looking at that cell
-			changes = append(changes,
-				cellLimiterChild(limit, append(markedCells, idCell), cluster)...)
-		}
+		// try a child run with the current cell
+		newCells := append(markedCells, availableCells[0])
+		newChanges = cellLimiterChild(newCells, availableCells[1:], cluster)
+		changes = append(changes, newChanges...)
 	}
-	return changes
+	return
 }
 
 // This covers rule 5:
-// 5) If any x cells have the same x values, the missing values are elsewhere
-//  excluded - those values are constrained to those cells.
-// ##TODO##
-func cellLimiter(cluster []cell) (changes []cell) {
-	upperBound := len(cluster)
-	for _, eachCell := range cluster {
-		if eachCell.actual != 0 {
-			upperBound--
+// 5) If any x cells have the same x values, the missing values are
+//  elsewhere excluded - those values are constrained to those cells.
+func cellLimiter(cluster []cell) []cell {
+	var availableCells []int
+
+	for id, each := range cluster {
+		if each.actual == 0 {
+			availableCells = append(availableCells, id)
 		}
 	}
-	for i := 2; i <= upperBound; i++ {
-		changes = append(changes, cellLimiterChild(i, []int{}, cluster)...)
-	}
-	return
+
+	return cellLimiterChild([]int{}, availableCells, cluster)
 }
 
 // This covers rule 6 from above:
