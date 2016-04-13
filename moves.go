@@ -132,6 +132,23 @@ func singleValueSolver(cluster []cell) (changes []cell) {
 // A helper function to determine the values certain cells hit
 // ##TODO## review
 func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
+	var first, second []int
+	first = cluster[markedCells[0]].excluded
+
+	switch {
+	case len(markedCells) < 1:
+		// this will only happen when passed one cell
+		return []int[]
+	case len(markedCells) > 1 :
+		remainder = valuesPainted(markedCells[1:], cluster)
+	default:
+		remainder = cluster[markedCells[1]].excluded
+	}
+
+	neededValues = subArr(fullArray, andArr(first, second))
+	return
+}
+func valuesPainted(markedCells []int, cluster []cell) (neededValues []int) {
 	for _, oneCell := range markedCells {
 		neededValues = addArr(neededValues, cluster[oneCell].possible)
 	}

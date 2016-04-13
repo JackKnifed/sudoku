@@ -41,6 +41,15 @@ func anyInArr(arr, tgt []int) bool {
 	return false
 }
 
+func allInArr(arr, tgt []int) bool {
+	for _, t := range tgt {
+		if !inArr(arr, t) {
+			return false
+		}
+	}
+	return true
+}
+
 // preforms a union of a and b and removes anhy duplicates
 func addArr(a, b []int) []int {
 	return dedupArr(append(a, b...))
