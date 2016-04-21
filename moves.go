@@ -28,10 +28,12 @@ package sudoku
 type intArray []int
 type indexedCluster map[int]intArray
 
+// maybe move fullArray into board, and move all of these moves into there?
 var fullArray intArray
 
+// need to initialize some other way?
 func init() {
-	for i, _ := range in {
+	for i, _ := range fullArray {
 		fullArray = append(fullArray, i)
 	}
 }
@@ -46,14 +48,19 @@ func indexCluster(in []cell) (out indexedCluster) {
 	}
 
 	// I can simply delete known values from the array
-	for id, each := range out {
-		if (each.actual) != 0 {
-			delete(out, id)
-		}
-		for _, oneExcluded := range each.excluded {
-			out[id] = subArr(out[id], []int{oneExcluded})
+	for _, each := range in {
+		if each.actual != 0{
+			delete(out, each.actual)
 		}
 	}
+
+	// remove all exclusions
+	for id, each := range in {
+		for _, exclusion := range each.excluded {
+			out[exclusion] = subArr(out[exclusion], []int{exclusion})
+		}
+	}
+
 	return out
 }
 
@@ -75,9 +82,9 @@ func clusterSolved(cluster []cell) (solved bool) {
 // 2) If any cell is solved, it has all exclusions.
 func solvedNoPossible(cluster []cell) (changes []cell) {
 	for id, each := range cluster {
-		if each.actual != 0 && each.excluded < len(cluster) {
+		if each.actual != 0 && len(each.excluded) < len(fullArray) {
 			newExclusion := subArr(fullArray, each.excluded)
-			changes = append(changes, cell{location: each.location, excluded: newExc})
+			changes = append(changes, cell{location: each.location, excluded: newExclusion})
 		}
 	}
 	return
@@ -99,7 +106,7 @@ func eliminateKnowns(cluster []cell) (changes []cell) {
 	for _, each := range cluster {
 		if !allInArr(each.excluded, knownValues) {
 			newExclusion := subArr(knownValues, each.excluded)
-			changes = append(changes, cell{location: each.location, excluded: newExc})
+			changes = append(changes, cell{location: each.location, excluded: newExclusion})
 		}
 	}
 	return
@@ -129,6 +136,10 @@ func singleValueSolver(cluster []cell) (changes []cell) {
 	return
 }
 
+// ## Start rule 5 ##
+// 5) If any x cells have the same x values, the missing values are
+//  elsewhere excluded - those values are constrained to those cells.
+// 
 // A helper function to determine the values certain cells hit
 // ##TODO## review
 func exclusionsPainted(markedCells []int, cluster []cell) []int {
@@ -139,7 +150,6 @@ func exclusionsPainted(markedCells []int, cluster []cell) []int {
 	case len(markedCells) == 1:
 		return cluster[markedCells[0]].excluded
 	default:
-		var first, second []int
 		first := cluster[markedCells[0]].excluded
 		second := exclusionsPainted(markedCells[1:], cluster)
 		return addArr(first, second)
@@ -152,7 +162,7 @@ func valuesPainted(markedCells []int, cluster []cell) []int {
 
 // A helper function to determine the number of valus hit given a specific set
 // of cells.
-func cellsCost(markedCells []int, cluster []cell) int {
+func valuesCost(markedCells []int, cluster []cell) int {
 	return len(valuesPainted(markedCells, cluster))
 }
 
@@ -164,15 +174,15 @@ func cellLimiterChild(markedCells, availableCells []int,
 		if len(valuesSeen) <= len(markedCells) {
 			// check the current marks, if valid, check removal
 			// check other cells for things to remove
-			cellsToClean = subArr(fullArray, markedCells)
+			cellsToClean := subArr(fullArray, markedCells)
 			for _, each := range cellsToClean {
-				valuesToRemove := subArr(valuesSeen, each.excluded)
+				valuesToRemove := subArr(valuesSeen, cluster[each].excluded)
 				if len(valuesToRemove) > 0 {
 					// if you found something to remove from another cell
 					// create that update
 					changes = append(changes, cell{
-						location: each.location,
-						actual:   each.actual,
+						location: cluster[each].location,
+						actual:   cluster[each].actual,
 						excluded: valuesToRemove})
 				}
 			}
@@ -190,7 +200,7 @@ func cellLimiterChild(markedCells, availableCells []int,
 	return
 }
 
-// This covers rule 5:
+// Actual function for rule 5:
 // 5) If any x cells have the same x values, the missing values are
 //  elsewhere excluded - those values are constrained to those cells.
 func cellLimiter(cluster []cell) []cell {
@@ -204,6 +214,8 @@ func cellLimiter(cluster []cell) []cell {
 
 	return cellLimiterChild([]int{}, availableCells, cluster)
 }
+
+// ## END Rule 5 ##
 
 // This covers rule 6 from above:
 // 6) If any value is possible in only one cell, that is that cell's value.
@@ -223,8 +235,9 @@ func singleCellSolver(index indexedCluster, cluster []cell) (changes []cell) {
 	return
 }
 
+// ## Start Rule 7 ##
+// 
 // A helper function to determine what cells are painted by given values
-// ##TODO## review
 func cellsPainted(markedVals []int, index indexedCluster) (neededCells []int) {
 	for _, value := range markedVals {
 		neededCells = addArr(neededCells, index[value])
@@ -234,30 +247,27 @@ func cellsPainted(markedVals []int, index indexedCluster) (neededCells []int) {
 
 // A helper function to determine the number of cells hit by working across a map
 // of values.
-// ##TODO## review
-func valuesCost(markedVals []int, index indexedCluster) int {
+func cellsCost(markedVals []int, index indexedCluster) int {
 	return len(cellsPainted(markedVals, index))
 }
 
-// ##TODO## review
 func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
-	cluster []cell) (changes bool) {
-	cellCount := valuesCost(markedValues, index)
+	cluster []cell) (changes []cell) {
+	cellCount := cellsCost(markedValues, index)
 	switch {
 	case cellCount < len(markedValues):
 		panic("less cells available than the values that need to go in them")
 	case len(markedValues) > limit:
 		// we have marked more values
-		return false
+		return []cell{}
 	case cellCount == len(markedValues):
 		// you have exactly as many values as cells
 		cellsCovered := cellsPainted(markedValues, index)
-		for id, each := range cellsCovered {
-			if toRemove := subArr(each.possible, markedValues); len(toRemove) > 0 {
+		for _, id := range cellsCovered {
+			if toRemove := subArr(markedValues, cluster[id].excluded); len(toRemove) > 0 {
 				changes = append(changes, cell{
-					location: each.location,
-					possible: toRemove,
-				})
+					location: cluster[id].location,
+					excluded: toRemove})
 			}
 		}
 	case len(markedValues) < limit:
@@ -269,7 +279,7 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 			}
 			// decend down into looking at that value
 			changes = append(changes, valueLimiterChild(limit, append(markedValues, value),
-				index, cluster, u))
+				index, cluster)...)
 		}
 	}
 	return
@@ -278,11 +288,10 @@ func valueLimiterChild(limit int, markedValues []int, index indexedCluster,
 // This covers rule 7 from above:
 // 7) If any x values are possible in x cells, all other values are excluded in
 //  those cells.
-// ##TODO##
 func valueLimiter(index indexedCluster, cluster []cell) (changes []cell) {
 	upperBound := len(index)
 	for i := 2; i <= upperBound; i++ {
-		changes = append(changes, valueLimiterCHild(i, []int{}, index, cluster))
+		changes = append(changes, valueLimiterChild(i, []int{}, index, cluster)...)
 	}
 	return changes
 }
