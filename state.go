@@ -7,41 +7,32 @@ package sudoku
 // * A channel to notify threads of updates
 // * A channel to update known & possible values
 
-import (
-	"errors"
-	"math"
-)
-
 const (
-	boardRow    = 0
-	boardCol    = 1
-	boardSquare = 2
+	InvalidValue = "invalid value for cell"
 )
 
-func number(i int) int {
+func intToBshift(i uint8) uint16 {
 	return 1 << i
 }
 
-// coord contains x and y elements for a given position
+// coord contains x and y elements for a given position - 0 indexed
 type coord struct {
-	x int
-	y int
+	x uint8
+	y uint8
 }
 
 // A cell holds all of the required knowledge for a cell.
-// It contains it's own address on the board (guarenteed unique)
+// It contains it's own address on the board (guaranteed unique)
 // if actual is set to 0, actual value is unknown
 type cell struct {
 	// memberBoard points back to the board
 	board *board
 
-	// location holds this cell's current location within the board
-	// it should not be changed
-	location coord
+	location coord // 0 indexed coordinates of the cell within the board
 
-	actual   int
-	possible int
-	excluded int
+	provided bool
+	solved   uint8
+	possible uint16
 }
 
 func (c cell) row() []cell {
@@ -61,339 +52,67 @@ func (c cell) col() (col []cell) {
 	return
 }
 
+func (c cell) blockStartAndEnd() (x1, x2, y1, y2 uint8) {
+	startAndEnd := func(coord uint8) (uint8, uint8) {
+		if coord >= c.board.width { // outside board bounds, so just cap it
+			coord = c.board.width - 1
+		}
+		// the following three lines are laid out so it's clearer what is going on
+		coord /= 3 // compress it down to each block with integer division (block 0, 1, 2)
+		coord *= 3 // expand that block back out (start 0, 3, or 6)
+		return coord + 1, coord + 3
+	}
+
+	x1, x2 = startAndEnd(c.location.x)
+	y1, y2 = startAndEnd(c.location.y)
+	return
+}
+
 func (c cell) block() (block []cell) {
 	if c.board == nil {
 		return []cell{}
 	}
-	c.location.x / 3
 
+	x1, x2, y1, y2 := c.blockStartAndEnd()
+	for _, partRow := range c.board.cells[x1:x2] {
+		for _, cellInPartRow := range partRow[y1:y2] {
+			block = append(block, cellInPartRow)
+		}
+	}
+	return
+}
+
+func (c *cell) ExcludePossible(val uint8) error {
+	if c.solved != 0 {
+		return sudokuError{errType: ErrCellAlreadSolved}
+	}
+	c.possible = c.possible &^ intToBshift(val)
+	return nil
+}
+
+func (c cell) IsPossible(val uint8) bool {
+	return c.possible&intToBshift(val) > 0
+}
+
+func (c *cell) SetStartValue(val uint8) error {
+	err := c.SetValue(val)
+	c.provided = true
+	return err
+}
+
+func (c *cell) SetValue(val uint8) error {
+	if c.solved != 0 || !c.IsPossible(val) {
+		return sudokuError{
+			errType: ErrInvalidValue,
+			args:    []interface{}{val},
+		}
+	}
+	c.solved = val
+	c.possible = intToBshift(val)
+	return nil
 }
 
 type board struct {
+	width uint8    // how wide/high the board is
 	cells [][]cell // x coord then y coord
-}
-/*
-
-// type Cluster interface {
-// 	Len() int
-// 	Swap(i, j int)
-// 	Less(i, j int)
-// }
-
-func (c Cluster) Len() int {
-	return len(c)
-}
-func (c Cluster) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-func (c Cluster) Less(i, j int) bool {
-	if c[i].x < c[j].x {
-		return true
-	}
-	if c[i].x == c[j].x && c[i].y < c[j].y {
-		return true
-	}
-	return false
-}
-
-func createBoard(size int) board {
-	var newBoard board
-	newBoard.size = size
-	for i := 0; i < size*size; i++ {
-		for j := 0; j < size*size; j++ {
-			board[coord{x: i, y: j}].location = coord{x: i, y: j}
-			for k := 1; k <= size*size; k++ {
-				board[coord{x: i, y: j}].possible = append(board[coord{x: i, y: j}].possible, k)
-			}
-		}
-	}
-	return newBoard
-}
-
-func getPos(position coord, orientation, size int) (int, error) {
-	if position.x >= size*size {
-		return -1, errors.New("x position is larger than the board")
-	}
-	if position.y >= size*size {
-		return -1, errors.New("y position is larger than the board")
-	}
-	switch orientation {
-	case boardRow:
-		return position.x
-	case boardCol:
-		return position.y
-	case boardSquare:
-		return ((position.y / size) * size) + (position.x / size)
-	default:
-		return -1, errors.New("bad position")
-	}
-}
-
-func clusterPicker(in board, orient int, position coord) (cluster, error) {
-	if position.x >= len(in) {
-		return cluster{}, errors.New("x coord out of range")
-	} else if position.y >= len(in) {
-		return cluster{}, errors.New("y coord out of range")
-	}
-	switch orient {
-	case boardRow:
-		return in[position.y], nil
-	case boardCol:
-		var result cluster
-		for _, each := range in {
-			result = append(result, each[position.x])
-		}
-		return outCluster, nil
-	case boardSquare:
-		var result cluster
-		boardSize := int(math.Sqrt(len(board)))
-		startX := (position.x / boardSize) * boardSize
-		endX := ((position.x / boardSize) + 1) * boardSize
-		startY := (position.y / boardSize) * boardSize
-		endY := ((position.y / boardSize) + 1) * boardSize
-		for x := startX; x < endX; x++ {
-			for y := startY; y < endY; y++ {
-				result = append(result, in[x][y])
-			}
-		}
-		return result, nil
-	default:
-		return cluster{}, errors.New("bad orientation")
-	}
-}
-
-func clusterFilter(update <-chan coord, in <-chan board, out [][]chan<- cluster, status [][]<-chan struct{}) {
-
-	var toWork cluster
-	defer closeArrArrChan(out)
-	// don't actually do anything until you have a board state to work with
-	<-in
-	for {
-		select {
-		case changed, more := <-update:
-			if !more {
-				return
-			}
-			for i = boardRow; i <= boardSquare; i++ {
-				curBoard := <-in
-				position := getPos(changed, i, curBoard.size)
-				if _, open := <-status[i][position]; !open {
-					// skip this update if the cluster is already solved
-					continue
-				}
-				curCluster, err := clusterPicker(curBoard, i, changed)
-				if err != nil {
-					panic(err) // #TODO# replace this panic
-				}
-				out[i][position] <- curCluster
-			}
-		}
-	}
-}
-
-// takes an input and sends it out as it can
-// exits when in is closed
-// closes out on exit
-func clusterSticky(in <-chan cluster, out chan<- cluster) {
-	var more bool
-	defer close(out)
-
-	// preload the locCluster - don't do anything until you have that
-	locCluster := <-in
-	for {
-		select {
-		case locCluster, more = <-in:
-			// if you get an update from upstream, do that first
-			if !more {
-				return
-			}
-		// pass the update downstream then block till you get another update from upstream
-		case out <- locCluster:
-			locCluster = <-in
-		}
-	}
-}
-
-// like a buffered channel, but no limit to the buffer size
-// closes out on exit
-// exits when in is closed
-func updateBuffer(in <-chan cell, out chan<- cell) {
-	var updates []interface{}
-	var singleUpdate interface{}
-	var open bool
-	defer close(out)
-
-	for {
-		if len(updates) < 1 {
-			// if you currently don't have anything to pass, WAIT FOR SOMETHING
-			singleUpdate, open = <-in
-			if !open {
-				return
-			}
-			updates = append(updates, singleUpdate)
-			continue
-		}
-		select {
-		case singleUpdate, open = <-in:
-			if !open {
-				return
-			}
-			updates = append(updates, singleUpdate)
-		case out <- updates[0]:
-			updates = updates[1:]
-		}
-	}
-}
-
-// boardCache serves a given (or newer) update out as many times as requested
-// closes `out` on exit
-// exits when in `is` closed
-func boardCache(in chan board, out chan<- board) {
-	currentBoard := <-in
-	var done bool
-	defer close(out)
-
-	for {
-		select {
-		case currentBoard, done = <-in:
-			if done {
-				return
-			}
-		case in <- currentBoard:
-		case out <- currentBoard:
-		}
-	}
-}
-
-// looks for a send from all status channels
-// if recieved or closed on all status chan, send on `idle`
-// if all status is closed, close idle and exits
-func idleCheck(status [][]<-chan interface{}, idle chan<- interface{}) {
-	var more, isIdle, isSolved bool
-	defer close(idle)
-
-	for {
-	start:
-		isSolved, isIdle = true, true
-		for _, middle := range status {
-			for _, inner := range status {
-				select {
-				case _, more = <-inner:
-					if more {
-						isSolved = false
-					}
-				default:
-					isSolved = false
-					isIdle = false
-					continue start
-				}
-			}
-		}
-		if isSolved {
-			return
-		} else if isIdle {
-			idle <- nil
-		}
-	}
-}
-
-// takes a given cluster, and runs it through all of the moves
-// exits when one of the conditions is met, or when the update channel is closed
-// closes the status channel on exit
-func clusterWorker(in <-chan cluster, status chan<- struct{}, updates chan<- cell, problems chan<- error) {
-	defer close(status)
-
-	var more bool
-	var newCluster cluster
-	var index indexedCluster
-	var changes, newChanges []cell
-
-	for {
-		select {
-		case newCluster, more = <-in:
-			if !more {
-				// if the channel is closed, exit
-				return
-			}
-			if clusterSolved(cluster) {
-				// if the cell is solved, exit
-				return
-			}
-
-			newChanges = solvedNoPossible(cluster.cells)
-			changes = append(changes, newChanges)
-
-			newChanges = eliminateKnowns(cluster.cells)
-			changes = append(changes, newChanges)
-
-			newChanges = singleValueSolver(cluster.cells)
-			changes = append(changes, newChanges)
-
-			newChanges = cellLimiter(cluster.cells)
-			changes = append(changes, newChanges)
-
-			index = indexCluster(cluster.cells)
-
-			newChanges = singleCellSolver(index, cluster.cells)
-			changes = append(changes, newChanges)
-
-			newChanges = valueLimiter(index, cluster.cells)
-			changes = append(changes, newChanges)
-
-			// feed all those changes into the update queue
-			for len(changes) > 1 {
-				updates <- changes[0]
-				changes = changes[1:]
-			}
-		case status <- nil:
-			// report idle only if there is nothing to do - order matters
-		}
-	}
-}
-
-// processes updates
-// priority is problems, updates, then status checks
-func updateProcessor(curBoard chan board, status <-chan struct{}, updates <-chan cell, posChange chan<- coord, problems <-chan error) {
-	defer close(curBoard)
-	defer close(posChange)
-
-	var newBoard board
-	var err error
-
-	for {
-		select {
-		case err = <-problems:
-			// any errors get top priority
-			// do error handling
-		case cellChange = <-updates:
-			// any udpates are handled before idle checks
-			newBoard, err = changeBoard(<-curBoard, cellChange)
-			if err != nil {
-				// do error handling
-			}
-		case _, solved = <-status:
-			// status check if neither of the above happens - or solved check
-		}
-	}
-}
-
-func changeBoard(in board, u cell) (board, error) {
-	t := in.clusters[u.location.x][u.location.y]
-	if u.actual != 0 {
-		// this is trying to update the
-		if t.actual != u.actual && t.actual != 0 {
-			return board{}, errors.New("got an update for a solved cell")
-		}
-		t.actual = u.actual
-	}
-	if len(u.excluded) > 0 {
-		t.excluded = addArr(t.excluded, u.excluded)
-		if len(t.excluded) >= in.level*in.level {
-			return board{}, errors.New("got an update that excludes every possibility")
-		}
-		if t.excluded[0] < 1 || t.excluded[len(t.excluded)-1] > level*level {
-			return board{}, errors.New("got an update that excludes an out of bound value")
-		}
-	}
-	return in, nil
 }
