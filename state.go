@@ -7,13 +7,20 @@ package sudoku
 // * A channel to notify threads of updates
 // * A channel to update known & possible values
 
-import "math"
+import (
+	"errors"
+	"math"
+)
 
 const (
 	boardRow    = 0
 	boardCol    = 1
 	boardSquare = 2
 )
+
+func number(i int) int {
+	return 1 << i
+}
 
 // coord contains x and y elements for a given position
 type coord struct {
@@ -25,26 +32,53 @@ type coord struct {
 // It contains it's own address on the board (guarenteed unique)
 // if actual is set to 0, actual value is unknown
 type cell struct {
+	// memberBoard points back to the board
+	board *board
+
+	// location holds this cell's current location within the board
+	// it should not be changed
 	location coord
+
 	actual   int
-	possible []int
-	excluded []int
+	possible int
+	excluded int
 }
 
-type cluster []cell
+func (c cell) row() []cell {
+	if c.board == nil {
+		return []cell{}
+	}
+	return c.board.cells[c.location.x]
+}
+
+func (c cell) col() (col []cell) {
+	if c.board == nil {
+		return []cell{}
+	}
+	for _, row := range c.board.cells {
+		col = append(col, row[c.location.y])
+	}
+	return
+}
+
+func (c cell) block() (block []cell) {
+	if c.board == nil {
+		return []cell{}
+	}
+	c.location.x / 3
+
+}
 
 type board struct {
-	size     int
-	clusters []cluster
+	cells [][]cell // x coord then y coord
 }
-
 /*
-type Cluster interface {
-	Len() int
-	Swap(i, j int)
-	Less(i, j int)
-}
-*/
+
+// type Cluster interface {
+// 	Len() int
+// 	Swap(i, j int)
+// 	Less(i, j int)
+// }
 
 func (c Cluster) Len() int {
 	return len(c)
