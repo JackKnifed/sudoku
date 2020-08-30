@@ -28,7 +28,8 @@ func (b board) Height() uint { return b.blockSize.y * b.blockAcross.y }
 
 func (b board) Nil() bool { return len(b.cells) == 0 }
 
-// Row positions are the first coordinate of [][]cells.
+// OtherRow returns the other cells in the same row as the given.
+// Rows are measured with the y (second) axis.
 // For example, in a 9x9 grid, the rows would be numbered as such
 //  x: 0 1 2   3 5 6   7 8 9
 // y -------------------------
@@ -44,14 +45,18 @@ func (b board) Nil() bool { return len(b.cells) == 0 }
 // 8 | 7 7 7 | 7 7 7 | 7 7 7 |
 // 9 | 8 8 8 | 8 8 8 | 8 8 8 |
 //   -------------------------
-func (b board) Row(id uint) []*cell {
+func (b board) OtherRow(id coord) (row []*cell) {
 	if b.Nil() {
 		return []*cell{}
 	}
-	return b.cells[id]
+	for _, col := range append(b.cells[:id.x], b.cells[id.x+1:]...) {
+		row = append(row, col[id.y])
+	}
+	return
 }
 
-// Col positions are the second coordinate of [][]cells
+// OtherCol returns the other cells in the same column as the given.
+// Col are measured with the x (first) axis.
 // For example, in a 9x9 grid, the rows would be numbered as such
 //  x: 0 1 2   3 5 6   7 8 9
 // y -------------------------
@@ -67,15 +72,11 @@ func (b board) Row(id uint) []*cell {
 // 8 | 0 1 2 | 3 4 5 | 6 7 8 |
 // 9 | 0 1 2 | 3 4 5 | 6 7 8 |
 //   -------------------------
-func (b board) col(id uint) (col []*cell) {
+func (b board) OtherCol(id coord) (col []*cell) {
 	if b.Nil() {
 		return []*cell{}
 	}
-	index := 0
-	for _, row := range b.cells {
-		row[index] = row[id]
-	}
-	return
+	return append(b.cells[id.x][:id.y], b.cells[id.x][id.y+1:]...)
 }
 
 // Block positions are left to right blocks of [][]cells
@@ -126,16 +127,23 @@ func (b board) col(id uint) (col []*cell) {
 // 16 | 9 9 9 9 9 | a a a a a | b b b b b |
 // 17 | 9 9 9 9 9 | a a a a a | b b b b b |
 //    |-----------------------------------|
-func (b board) Block(id uint) (block []*cell) {
+// Thus OtherBlock coord{8,a} returns coord{[5:9],[6:b]} except coord{8,a}
+func (b board) OtherBlock(id coord) (block []*cell) {
 	if b.Nil() {
 		return []*cell{}
 	}
 
-	rowStart := (id / b.blockAcross.x) * b.blockSize.y
-	colStart := (id % b.blockAcross.y) * b.blockSize.x
+	// figure out how many cells you are into each row/col, and go back that many
+	xStart := id.x - (id.x % b.blockSize.x)
+	yStart := id.y - (id.y % b.blockSize.y)
 
-	for _, rowSlice := range b.cells[rowStart : rowStart+b.blockSize.y] {
-		block = append(block, rowSlice[colStart:colStart+b.blockSize.x]...)
+	// step through each cell
+	for x := uint(xStart); x < xStart+b.blockSize.y; x++ {
+		for y := uint(yStart); y < yStart+b.blockSize.y; y++ {
+			if x != id.x || y != id.y {
+				block = append(block, b.cells[x][y])
+			}
+		}
 	}
 	return
 }
@@ -158,24 +166,22 @@ func (b board) Block(id uint) (block []*cell) {
 //   -------------------------
 // This returns cells marked by X [2,5], [4,5], [2,7], [4,7]
 // Also note, if this is on an edge or corner, it will return less values.
-func (b board) Corners(pos coord) (corners []*cell) {
-	appendCell := func(x, y uint) {
-		corners = append(corners, b.cells[x][y])
+func (b board) OtherCorners(pos coord) (corners []*cell) {
+	// top left
+	if pos.x > 0 && pos.y > 0 {
+		corners = append(corners, b.cells[pos.x-1][pos.y-1])
 	}
-	walkY := func(x, y uint) {
-		if y > 0 {
-			appendCell(x, y-1)
-		} else if y < b.Width()-1 {
-			appendCell(x, y+1)
-		}
+	// bottom left
+	if pos.x < b.Width()+1 && pos.y > 0 {
+		corners = append(corners, b.cells[pos.x-1][pos.y+1])
 	}
-	walkX := func(x, y uint) {
-		if x > 0 {
-			walkY(x-1, y)
-		} else if x < b.Height()-1 {
-			walkY(x+1, y)
-		}
+	// top right
+	if pos.x > 0 && pos.y < b.Height()+1 {
+		corners = append(corners, b.cells[pos.x+1][pos.y-1])
 	}
-	walkX(pos.x, pos.y)
+	// bottom right
+	if pos.x < b.Width()+1 && pos.y < b.Height()+1 {
+		corners = append(corners, b.cells[pos.x+1][pos.y+1])
+	}
 	return
 }
