@@ -1,19 +1,24 @@
 package sudoku
 
 type board struct {
-	cells [][]cell // x coord then y coord
+	cells [][]*cell // x coord then y coord
 
 	blockSize   coord // # of cells in each block in each direction
 	blockAcross coord // # of blocks on the board in each direction
 }
 
 func (b board) Init() {
-	b.cells = make([][]cell, b.blockSize.x*b.blockAcross.x)
+	b.cells = make([][]*cell, b.blockSize.x*b.blockAcross.x)
 	for i := range b.cells {
-		b.cells[i] = make([]cell, b.blockSize.y*b.blockAcross.y)
+		b.cells[i] = make([]*cell, b.blockSize.y*b.blockAcross.y)
 		for j := range b.cells[i] {
-			b.cells[i][j].board = &b
-			b.cells[i][j].location = coord{x: uint(i), y: uint(j)}
+			b.cells[i][j] = &cell{
+				board: &b,
+				location: coord{
+					x: uint(i),
+					y: uint(j),
+				},
+			}
 		}
 	}
 }
@@ -35,9 +40,9 @@ func (b board) Nil() bool { return len(b.cells) == 0 }
 // | 7 7 7 | 7 7 7 | 7 7 7 |
 // | 8 8 8 | 8 8 8 | 8 8 8 |
 // -------------------------
-func (b board) Row(id uint) []cell {
+func (b board) Row(id uint) []*cell {
 	if b.Nil() {
-		return []cell{}
+		return []*cell{}
 	}
 	return b.cells[id]
 }
@@ -57,12 +62,14 @@ func (b board) Row(id uint) []cell {
 // | 0 1 2 | 3 4 5 | 6 7 8 |
 // | 0 1 2 | 3 4 5 | 6 7 8 |
 // -------------------------
-func (b board) Col(id uint) (col []cell) {
+func (b board) Col(x, y uint) (col []*cell) {
+	_ = x
 	if b.Nil() {
-		return []cell{}
+		return []*cell{}
 	}
+	index := 0
 	for _, row := range b.cells {
-		col = append(col, row[id])
+		row[index] = row[y]
 	}
 	return
 }
@@ -115,12 +122,17 @@ func (b board) Col(id uint) (col []cell) {
 // 16 | 9 9 9 9 9 | a a a a a | b b b b b |
 // 17 | 9 9 9 9 9 | a a a a a | b b b b b |
 //    |-----------------------------------|
-func (b board) Block(id uint) (block []cell) {
+func (b board) Block(x, y uint) (block []*cell) {
 	if b.Nil() {
-		return []cell{}
+		return []*cell{}
 	}
-	rowStart := (id / b.blockAcross.x) * b.blockSize.y
-	colStart := (id % b.blockAcross.y) * b.blockSize.x
+
+	xBlock := x / b.blockSize.x
+	yBlock := y / b.blockSize.y
+	blockID := yBlock*b.blockAcross.y + xBlock
+
+	rowStart := (blockID / b.blockAcross.x) * b.blockSize.y
+	colStart := (blockID % b.blockAcross.y) * b.blockSize.x
 
 	for _, rowSlice := range b.cells[rowStart : rowStart+b.blockSize.y] {
 		block = append(block, rowSlice[colStart:colStart+b.blockSize.x]...)

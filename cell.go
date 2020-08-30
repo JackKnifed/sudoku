@@ -67,9 +67,3 @@ func (c *cell) SetValue(val uint) error {
 	c.excluded = ^uintToBshift(val)
 	return nil
 }
-
-func (c cell) BlockNum(width uint) uint {
-	xBlock := c.location.x / c.board.blockSize.x
-	yBlock := c.location.y / c.board.blockSize.y
-	return yBlock*c.board.blockAcross.y + xBlock
-}
