@@ -8,7 +8,9 @@ type board struct {
 }
 
 func (b board) Init() {
+	b.cells = make([][]cell, b.blockSize.x*b.blockAcross.x)
 	for i := range b.cells {
+		b.cells[i] = make([]cell, b.blockSize.y*b.blockAcross.y)
 		for j := range b.cells[i] {
 			b.cells[i][j].board = &b
 			b.cells[i][j].location = coord{x: uint(i), y: uint(j)}

@@ -17,10 +17,12 @@ func (e sudokuError) Error() string {
 const (
 	ErrInvalidValue = 1 << iota
 	ErrCellAlreadSolved
+	ErrInvalidBoardDimensions
 )
 
 var errFmtStrings = []string{
 	"err %d undefined",
 	"invalid value %s for cell",
 	"cell is already solved",
+	"board dimension [%d,%d] are invalid for [%d,%d] chunks of [%d,%d]",
 }

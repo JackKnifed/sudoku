@@ -60,7 +60,7 @@ func (c *cell) SetValue(val uint) error {
 	if c.solved != 0 || !c.IsPossible(val) {
 		return sudokuError{
 			errType: ErrInvalidValue,
-			args:    []uinterface{}{val},
+			args:    []interface{}{val},
 		}
 	}
 	c.solved = val
