@@ -7,6 +7,15 @@ type board struct {
 	blockAcross coord // # of blocks on the board in each direction
 }
 
+func (b board) Init() {
+	for i := range b.cells {
+		for j := range b.cells[i] {
+			b.cells[i][j].board = &b
+			b.cells[i][j].location = coord{x: uint(i), y: uint(j)}
+		}
+	}
+}
+
 func (b board) Nil() bool { return len(b.cells) == 0 }
 
 // Row positions are the first coordinate of [][]cells.
@@ -24,7 +33,7 @@ func (b board) Nil() bool { return len(b.cells) == 0 }
 // | 7 7 7 | 7 7 7 | 7 7 7 |
 // | 8 8 8 | 8 8 8 | 8 8 8 |
 // -------------------------
-func (b board) Row(id uint8) []cell {
+func (b board) Row(id uint) []cell {
 	if b.Nil() {
 		return []cell{}
 	}
@@ -46,7 +55,7 @@ func (b board) Row(id uint8) []cell {
 // | 0 1 2 | 3 4 5 | 6 7 8 |
 // | 0 1 2 | 3 4 5 | 6 7 8 |
 // -------------------------
-func (b board) Col(id uint8) (col []cell) {
+func (b board) Col(id uint) (col []cell) {
 	if b.Nil() {
 		return []cell{}
 	}
@@ -71,7 +80,7 @@ func (b board) Col(id uint8) (col []cell) {
 // | 6 6 6 | 7 7 7 | 8 8 8 |
 // | 6 6 6 | 7 7 7 | 8 8 8 |
 // -------------------------
-// More interesting, take a nonsense example (that still must work)
+// More uinteresting, take a nonsense example (that still must work)
 // blockAcross := coord{x:3, y:4}
 // blockSize := coord{x: 5, y:6}
 //   x: 0 1 2 3 4   5 6 7 8 9   a b c d e
@@ -104,7 +113,7 @@ func (b board) Col(id uint8) (col []cell) {
 // 16 | 9 9 9 9 9 | a a a a a | b b b b b |
 // 17 | 9 9 9 9 9 | a a a a a | b b b b b |
 //    |-----------------------------------|
-func (b board) Block(id uint8) (block []cell) {
+func (b board) Block(id uint) (block []cell) {
 	if b.Nil() {
 		return []cell{}
 	}
@@ -112,9 +121,7 @@ func (b board) Block(id uint8) (block []cell) {
 	colStart := (id % b.blockAcross.y) * b.blockSize.x
 
 	for _, rowSlice := range b.cells[rowStart : rowStart+b.blockSize.y] {
-		for _, cellInPartRow := range rowSlice[colStart : colStart+b.blockSize.x] {
-			block = append(block, cellInPartRow)
-		}
+		block = append(block, rowSlice[colStart:colStart+b.blockSize.x]...)
 	}
 	return
 }

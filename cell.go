@@ -11,14 +11,14 @@ const (
 	InvalidValue = "invalid value for cell"
 )
 
-func intToBshift(i uint8) uint16 {
+func uintToBshift(i uint) uint {
 	return 1 << i
 }
 
 // coord contains x and y elements for a given position - 0 indexed
 type coord struct {
-	x uint8
-	y uint8
+	x uint
+	y uint
 }
 
 // A cell holds all of the required knowledge for a cell.
@@ -31,44 +31,44 @@ type cell struct {
 	location coord // 0 indexed coordinates of the cell within the board
 
 	provided bool
-	solved   uint8
-	excluded uint16
+	solved   uint
+	excluded uint
 }
 
-func (c *cell) ExcludePossible(val uint8) error {
+func (c *cell) ExcludePossible(val uint) error {
 	if c.solved != 0 {
 		return sudokuError{errType: ErrCellAlreadSolved}
 	}
 	// set the bit to excluded
-	c.excluded = c.excluded | intToBshift(val)
+	c.excluded = c.excluded | uintToBshift(val)
 	return nil
 }
 
-func (c cell) IsPossible(val uint8) bool {
+func (c cell) IsPossible(val uint) bool {
 	// c.excluded are the values that have been excluded
 	// ^c.excluded are the values still possible
-	return ^c.excluded&intToBshift(val) > 0
+	return ^c.excluded&uintToBshift(val) > 0
 }
 
-func (c *cell) SetStartValue(val uint8) error {
+func (c *cell) SetStartValue(val uint) error {
 	err := c.SetValue(val)
 	c.provided = true
 	return err
 }
 
-func (c *cell) SetValue(val uint8) error {
+func (c *cell) SetValue(val uint) error {
 	if c.solved != 0 || !c.IsPossible(val) {
 		return sudokuError{
 			errType: ErrInvalidValue,
-			args:    []interface{}{val},
+			args:    []uinterface{}{val},
 		}
 	}
 	c.solved = val
-	c.excluded = ^intToBshift(val)
+	c.excluded = ^uintToBshift(val)
 	return nil
 }
 
-func (c cell) BlockNum(width uint8) uint8 {
+func (c cell) BlockNum(width uint) uint {
 	xBlock := c.location.x / c.board.blockSize.x
 	yBlock := c.location.y / c.board.blockSize.y
 	return yBlock*c.board.blockAcross.y + xBlock
