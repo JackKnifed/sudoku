@@ -32,19 +32,22 @@ type cell struct {
 
 	provided bool
 	solved   uint8
-	possible uint16
+	excluded uint16
 }
 
 func (c *cell) ExcludePossible(val uint8) error {
 	if c.solved != 0 {
 		return sudokuError{errType: ErrCellAlreadSolved}
 	}
-	c.possible = c.possible &^ intToBshift(val)
+	// set the bit to excluded
+	c.excluded = c.excluded | intToBshift(val)
 	return nil
 }
 
 func (c cell) IsPossible(val uint8) bool {
-	return c.possible&intToBshift(val) > 0
+	// c.excluded are the values that have been excluded
+	// ^c.excluded are the values still possible
+	return ^c.excluded&intToBshift(val) > 0
 }
 
 func (c *cell) SetStartValue(val uint8) error {
@@ -61,11 +64,11 @@ func (c *cell) SetValue(val uint8) error {
 		}
 	}
 	c.solved = val
-	c.possible = intToBshift(val)
+	c.excluded = ^intToBshift(val)
 	return nil
 }
 
-func (c cell) blockNum(width uint8) uint8 {
+func (c cell) BlockNum(width uint8) uint8 {
 	xBlock := c.location.x / c.board.blockSize.x
 	yBlock := c.location.y / c.board.blockSize.y
 	return yBlock*c.board.blockAcross.y + xBlock
