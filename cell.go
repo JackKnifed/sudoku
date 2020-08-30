@@ -35,53 +35,6 @@ type cell struct {
 	possible uint16
 }
 
-func (c cell) row() []cell {
-	if c.board == nil {
-		return []cell{}
-	}
-	return c.board.cells[c.location.x]
-}
-
-func (c cell) col() (col []cell) {
-	if c.board == nil {
-		return []cell{}
-	}
-	for _, row := range c.board.cells {
-		col = append(col, row[c.location.y])
-	}
-	return
-}
-
-func (c cell) blockStartAndEnd() (x1, x2, y1, y2 uint8) {
-	startAndEnd := func(coord uint8) (uint8, uint8) {
-		if coord >= c.board.width { // outside board bounds, so just cap it
-			coord = c.board.width - 1
-		}
-		// the following three lines are laid out so it's clearer what is going on
-		coord /= 3 // compress it down to each block with integer division (block 0, 1, 2)
-		coord *= 3 // expand that block back out (start 0, 3, or 6)
-		return coord + 1, coord + 3
-	}
-
-	x1, x2 = startAndEnd(c.location.x)
-	y1, y2 = startAndEnd(c.location.y)
-	return
-}
-
-func (c cell) block() (block []cell) {
-	if c.board == nil {
-		return []cell{}
-	}
-
-	x1, x2, y1, y2 := c.blockStartAndEnd()
-	for _, partRow := range c.board.cells[x1:x2] {
-		for _, cellInPartRow := range partRow[y1:y2] {
-			block = append(block, cellInPartRow)
-		}
-	}
-	return
-}
-
 func (c *cell) ExcludePossible(val uint8) error {
 	if c.solved != 0 {
 		return sudokuError{errType: ErrCellAlreadSolved}
@@ -112,7 +65,8 @@ func (c *cell) SetValue(val uint8) error {
 	return nil
 }
 
-type board struct {
-	width uint8    // how wide/high the board is
-	cells [][]cell // x coord then y coord
+func (c cell) blockNum(width uint8) uint8 {
+	xBlock := c.location.x / c.board.blockSize.x
+	yBlock := c.location.y / c.board.blockSize.y
+	return yBlock*c.board.blockAcross.y + xBlock
 }
